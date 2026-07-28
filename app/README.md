@@ -37,17 +37,44 @@ script has not actually been run — see "Status" below.
 ## Layout
 
 - `lib/core/models` — plain Dart classes mirroring the backend's JSON (`User`, `Vendor`, `MenuItem`, `Order`). Keep `OrderStatus` in `lib/core/models/order.dart` in sync with `backend/internal/models/models.go` if the status machine changes.
-- `lib/core/api_client.dart` — the only place that talks HTTP; every screen goes through it.
+- `lib/core/api_client.dart` — the only place that talks HTTP; every screen goes through it. Takes an optional `client: http.Client` so tests can swap in `package:http/testing.dart`'s `MockClient` instead of hitting the network.
 - `lib/core/state` — `AuthState` (session + token persistence via `shared_preferences`) and `CartState` (single-vendor cart, since an order belongs to one stall) as `ChangeNotifier`s via `provider`.
 - `lib/features/auth` — login/register.
 - `lib/features/customer` — stall list, stall menu + add to cart, cart/checkout, order status (polls every 5s while open), order history.
 - `lib/features/vendor` — stall setup, orders tab (accept/prepare/ready/complete, polls every 8s), menu management tab.
+
+## Golden tests
+
+`test/golden/` has widget-level golden (screenshot) tests for the screens
+that render meaningfully without a live backend: login, register, cart
+(empty + with items), the vendor list, order status, and the vendor
+create-stall form. Screens that need data mock the network via
+`package:http/testing.dart`'s `MockClient` (see
+`vendor_list_screen_test.dart`, `order_status_screen_test.dart`,
+`vendor_create_stall_screen_test.dart` for the pattern) — `test_helpers.dart`'s
+`pumpGolden` wires up the same providers `main.dart` does.
+
+```
+flutter test                      # run all tests, compares against test/golden/*/goldens/*.png
+flutter test --update-goldens     # (re)generate the reference PNGs after an intentional UI change
+```
+
+**The reference PNGs are not included yet.** `matchesGoldenFile` needs a
+real Flutter renderer to produce them, and this sandbox has neither the
+Flutter SDK nor network access to install it (see "Status" below) — so
+`flutter test --update-goldens` has never actually been run for this repo.
+Run it once on a machine with Flutter installed, eyeball the generated
+`test/golden/*/goldens/*.png` files to confirm they look right, then commit
+them — after that, plain `flutter test` will catch any unintended visual
+regression. Golden images are OS/Flutter-version sensitive; regenerate them
+if you change Flutter version or run CI on a different OS than local dev.
 
 ## Status
 
 Written and reviewed for consistency against the backend's request/response
 shapes, but this environment has no Flutter/Dart SDK — and its network
 policy blocks both the SDK download host (`storage.googleapis.com`) and
-`pub.dev` — so `flutter analyze` and `flutter run` have not actually been
-run against this code. Treat it as unverified until you run it locally with
-`scripts/run_dev.sh` or the manual steps above.
+`pub.dev` — so `flutter analyze`, `flutter run`, and `flutter test`
+(including generating the golden tests' reference images) have not actually
+been run against this code. Treat it as unverified until you run it locally
+with `scripts/run_dev.sh` or the manual steps above.

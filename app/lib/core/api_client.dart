@@ -15,9 +15,12 @@ import 'models/vendor.dart';
 /// ให้ส่ง baseUrl: 'http://10.0.2.2:8080/api' แทนตอน new ApiClient()
 class ApiClient {
   final String baseUrl;
+  final http.Client _client;
   String? token; // JWT ที่ได้จาก login/register เก็บไว้แนบไปกับทุก request ที่ต้อง auth
 
-  ApiClient({this.baseUrl = 'http://localhost:8080/api'});
+  /// [client] ใส่ให้ override ได้สำหรับเทส (เช่น package:http/testing.dart's
+  /// MockClient) ปกติไม่ต้องส่งค่านี้มา จะใช้ http.Client() จริงให้อัตโนมัติ
+  ApiClient({this.baseUrl = 'http://localhost:8080/api', http.Client? client}) : _client = client ?? http.Client();
 
   Map<String, String> _headers({bool json = true}) {
     final headers = <String, String>{};
@@ -39,22 +42,22 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) async {
-    final res = await http.post(Uri.parse('$baseUrl$path'), headers: _headers(), body: jsonEncode(body));
+    final res = await _client.post(Uri.parse('$baseUrl$path'), headers: _headers(), body: jsonEncode(body));
     return await _decode(res) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> _patch(String path, Map<String, dynamic> body) async {
-    final res = await http.patch(Uri.parse('$baseUrl$path'), headers: _headers(), body: jsonEncode(body));
+    final res = await _client.patch(Uri.parse('$baseUrl$path'), headers: _headers(), body: jsonEncode(body));
     return await _decode(res) as Map<String, dynamic>;
   }
 
   Future<dynamic> _get(String path) async {
-    final res = await http.get(Uri.parse('$baseUrl$path'), headers: _headers(json: false));
+    final res = await _client.get(Uri.parse('$baseUrl$path'), headers: _headers(json: false));
     return await _decode(res);
   }
 
   Future<void> _delete(String path) async {
-    final res = await http.delete(Uri.parse('$baseUrl$path'), headers: _headers(json: false));
+    final res = await _client.delete(Uri.parse('$baseUrl$path'), headers: _headers(json: false));
     await _decode(res);
   }
 
