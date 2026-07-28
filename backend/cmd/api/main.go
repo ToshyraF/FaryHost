@@ -52,6 +52,10 @@ func main() {
 	mux.Handle("GET /api/orders/{id}", auth(http.HandlerFunc(s.GetOrder))) // ลูกค้าหรือร้านค้าก็เรียกได้ เช็คสิทธิ์ในตัว handler เอง
 	mux.Handle("PATCH /api/orders/{id}/status", vendorOnly(http.HandlerFunc(s.UpdateOrderStatus)))
 
+	// Omise เรียก webhook นี้เข้ามาเองตอนสถานะการจ่ายเงินเปลี่ยน (public: ไม่มี
+	// JWT แนบมาด้วย ความปลอดภัยทำโดยเรียกกลับไปยืนยันกับ Omise เองใน handler)
+	mux.HandleFunc("POST /api/webhooks/omise", s.OmiseWebhook)
+
 	// ห่อทั้ง mux ด้วย logging กับ CORS อีกชั้นนอกสุด (ใช้กับทุก route)
 	handler := middleware.Logging(middleware.CORS(mux))
 

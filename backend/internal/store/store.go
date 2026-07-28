@@ -241,6 +241,21 @@ func (s *Store) GetOrder(id string) (*models.Order, error) {
 	return o, nil
 }
 
+// GetOrderByChargeID หา order จาก Omise charge ID ที่ผูกไว้ตอนสร้างออเดอร์
+// ใช้ตอน webhook จาก Omise ส่งเข้ามา (ดู handlers.OmiseWebhook) จำนวนออเดอร์
+// ในระบบยังน้อย การวนหาแบบ linear scan จึงเพียงพอ ไม่ต้องทำ index แยก
+func (s *Store) GetOrderByChargeID(chargeID string) (*models.Order, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, o := range s.ordersByID {
+		if o.PaymentChargeID == chargeID {
+			return o, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
 // ListOrdersByCustomer คืนประวัติการสั่งของลูกค้าคนหนึ่ง (ใหม่สุดขึ้นก่อน)
 func (s *Store) ListOrdersByCustomer(customerID string) []*models.Order {
 	s.mu.RLock()

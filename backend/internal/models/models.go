@@ -14,23 +14,30 @@ const (
 type OrderStatus string
 
 const (
-	OrderPending   OrderStatus = "pending"   // ลูกค้าสั่งแล้ว รอร้านค้ากดรับออเดอร์
-	OrderAccepted  OrderStatus = "accepted"  // ร้านค้ารับออเดอร์แล้ว
-	OrderPreparing OrderStatus = "preparing" // ร้านค้ากำลังทำอาหาร
-	OrderReady     OrderStatus = "ready"     // อาหารเสร็จแล้ว พร้อมให้ลูกค้ามารับ
-	OrderCompleted OrderStatus = "completed" // ลูกค้ามารับอาหารเรียบร้อยแล้ว (สถานะจบ)
-	OrderCancelled OrderStatus = "cancelled" // ออเดอร์ถูกยกเลิก (สถานะจบ)
+	OrderAwaitingPayment OrderStatus = "awaiting_payment" // สร้างออเดอร์แล้ว รอลูกค้าสแกน QR จ่ายเงินให้เสร็จก่อน
+	OrderPending         OrderStatus = "pending"          // จ่ายเงินสำเร็จแล้ว รอร้านค้ากดรับออเดอร์
+	OrderAccepted        OrderStatus = "accepted"         // ร้านค้ารับออเดอร์แล้ว
+	OrderPreparing       OrderStatus = "preparing"        // ร้านค้ากำลังทำอาหาร
+	OrderReady           OrderStatus = "ready"            // อาหารเสร็จแล้ว พร้อมให้ลูกค้ามารับ
+	OrderCompleted       OrderStatus = "completed"        // ลูกค้ามารับอาหารเรียบร้อยแล้ว (สถานะจบ)
+	OrderCancelled       OrderStatus = "cancelled"        // ออเดอร์ถูกยกเลิก (สถานะจบ)
 )
 
 // NextStatuses กำหนดว่าจากสถานะปัจจุบัน ร้านค้าสามารถเปลี่ยนไปสถานะไหนต่อได้บ้าง
 // (ห้ามข้ามขั้นตอน เช่น จาก pending จะกระโดดไป ready เลยไม่ได้)
 // ทั้ง backend (handlers.isAllowedTransition) และฝั่ง Flutter
 // (lib/core/models/order.dart) ต้องใช้กติกาเดียวกันนี้ ถ้าแก้ต้องแก้ทั้งคู่
+//
+// หมายเหตุ: การเปลี่ยนจาก OrderAwaitingPayment -> OrderPending ไม่ได้อยู่ใน
+// ตารางนี้ เพราะไม่ใช่การกระทำของร้านค้า แต่เป็นระบบเปลี่ยนให้อัตโนมัติ
+// ทันทีที่ยืนยันกับ Omise ได้ว่าจ่ายเงินสำเร็จแล้ว (ดู handlers.confirmPayment)
+// ร้านค้าทำได้แค่ยกเลิกออเดอร์ที่ยังไม่จ่ายเงินเท่านั้น
 var NextStatuses = map[OrderStatus][]OrderStatus{
-	OrderPending:   {OrderAccepted, OrderCancelled},
-	OrderAccepted:  {OrderPreparing, OrderCancelled},
-	OrderPreparing: {OrderReady, OrderCancelled},
-	OrderReady:     {OrderCompleted},
+	OrderAwaitingPayment: {OrderCancelled},
+	OrderPending:         {OrderAccepted, OrderCancelled},
+	OrderAccepted:        {OrderPreparing, OrderCancelled},
+	OrderPreparing:       {OrderReady, OrderCancelled},
+	OrderReady:           {OrderCompleted},
 	// OrderCompleted และ OrderCancelled เป็นสถานะจบ ไม่มีขั้นต่อไปแล้ว
 }
 
@@ -82,6 +89,8 @@ type OrderItem struct {
 }
 
 // Order คือคำสั่งซื้อของลูกค้า 1 ออเดอร์ (สั่งได้ทีละร้านเดียว)
+// การจ่ายเงินเป็นแบบบังคับผ่าน Omise PromptPay QR (ดู internal/omise) ไม่มี
+// ทางเลือกจ่ายเงินสดหน้าร้านแล้ว
 type Order struct {
 	ID         string      `json:"id"`
 	Code       string      `json:"code"` // รหัสสั้นๆ ที่ลูกค้าใช้แสดงหน้าร้านตอนมารับอาหาร
@@ -91,6 +100,15 @@ type Order struct {
 	TotalCents int64       `json:"total_cents"` // ยอดรวมทั้งออเดอร์ (ผลรวมของ SubtotalCents ทุกรายการ)
 	Note       string      `json:"note,omitempty"`
 	Items      []OrderItem `json:"items"`
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
+
+	// PaymentChargeID คือ ID ของ Omise charge ที่ผูกกับออเดอร์นี้ ใช้ตอน
+	// ยืนยันสถานะการจ่ายเงินย้อนกลับไปที่ Omise (ทั้งตอน webhook มาถึงและ
+	// ตอน GetOrder ถูกเรียกซ้ำๆ ระหว่างที่ลูกค้ายังไม่จ่ายเงิน)
+	PaymentChargeID string `json:"-"`
+	// PaymentQRCodeURI คือ URL รูป QR code ให้ลูกค้าสแกนจ่ายเงิน มีค่าเฉพาะ
+	// ตอนสถานะเป็น OrderAwaitingPayment เท่านั้น
+	PaymentQRCodeURI string `json:"payment_qr_code_uri,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

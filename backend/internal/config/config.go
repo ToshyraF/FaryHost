@@ -7,17 +7,21 @@ import (
 
 // Config เก็บค่าคอนฟิกที่โหลดมาจาก environment variables ตอนโปรแกรมเริ่มทำงาน
 type Config struct {
-	Addr      string        // ที่อยู่/พอร์ตที่ HTTP server จะ listen เช่น ":8080"
-	JWTSecret []byte        // คีย์ลับสำหรับเซ็น/ตรวจสอบ JWT (ดู internal/authutil)
-	TokenTTL  time.Duration // อายุของ JWT ก่อนหมดอายุ ต้อง login ใหม่
+	Addr            string        // ที่อยู่/พอร์ตที่ HTTP server จะ listen เช่น ":8080"
+	JWTSecret       []byte        // คีย์ลับสำหรับเซ็น/ตรวจสอบ JWT (ดู internal/authutil)
+	TokenTTL        time.Duration // อายุของ JWT ก่อนหมดอายุ ต้อง login ใหม่
+	OmiseSecretKey  string        // secret key จาก Omise/Opn Payments dashboard ใช้เรียก API เก็บเงิน
+	PaymentCurrency string        // สกุลเงินที่ใช้เก็บเงิน (Omise ต้องการตัวพิมพ์เล็ก เช่น "thb")
 }
 
 // Load อ่านค่าคอนฟิกจาก env var ถ้าไม่มีค่าจะใช้ค่า default แทน
 func Load() Config {
 	return Config{
-		Addr:      getEnv("ADDR", ":8080"),
-		JWTSecret: []byte(getEnv("JWT_SECRET", "dev-secret-change-me")),
-		TokenTTL:  24 * time.Hour,
+		Addr:            getEnv("ADDR", ":8080"),
+		JWTSecret:       []byte(getEnv("JWT_SECRET", "dev-secret-change-me")),
+		TokenTTL:        24 * time.Hour,
+		OmiseSecretKey:  getEnv("OMISE_SECRET_KEY", ""),
+		PaymentCurrency: getEnv("PAYMENT_CURRENCY", "thb"),
 	}
 }
 

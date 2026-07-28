@@ -8,7 +8,8 @@ import '../../core/state/cart_state.dart';
 import 'order_status_screen.dart';
 
 /// หน้าตะกร้า/เช็คเอาต์ — ยืนยันสั่งอาหารแล้วยิง POST /api/orders
-/// จ่ายเงินสดหน้าร้านเท่านั้น ไม่มีการชำระเงินผ่านแอป (MVP นี้ยังไม่รองรับ)
+/// backend จะสร้างรายการเก็บเงินกับ Omise (PromptPay QR) ให้ทันที ออเดอร์จะ
+/// อยู่ในสถานะ "รอชำระเงิน" จนกว่าจะสแกนจ่ายสำเร็จ (ดู OrderStatusScreen ต่อ)
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
@@ -113,7 +114,7 @@ class _CartScreenState extends State<CartScreen> {
                   onPressed: _submitting ? null : _placeOrder,
                   child: _submitting
                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('ยืนยันสั่งอาหาร (จ่ายเงินสดหน้าร้าน)'),
+                      : const Text('ยืนยันและชำระเงิน'),
                 ),
               ],
             ),

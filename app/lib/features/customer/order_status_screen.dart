@@ -7,8 +7,9 @@ import '../../core/api_client.dart';
 import '../../core/format.dart';
 import '../../core/models/order.dart';
 
-/// หน้าจอติดตามสถานะออเดอร์ 1 รายการ พร้อมโชว์รหัสรับอาหารตัวใหญ่ๆ
-/// ให้ลูกค้าเอาไปยื่นให้ร้านค้าตอนไปรับของ
+/// หน้าจอติดตามสถานะออเดอร์ 1 รายการ — ตอนสถานะเป็น "รอชำระเงิน" จะโชว์ QR
+/// PromptPay ให้สแกนจ่าย พอจ่ายสำเร็จ (ระบบเปลี่ยนสถานะให้อัตโนมัติ) จะเปลี่ยน
+/// มาโชว์รหัสรับอาหารตัวใหญ่ๆ ให้เอาไปยื่นให้ร้านค้าตอนไปรับของแทน
 class OrderStatusScreen extends StatefulWidget {
   final String orderId;
 
@@ -28,6 +29,8 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
     _load();
     // ทำ "live status" แบบประหยัดๆ โดยไม่ต้องใช้ websocket: ดึงข้อมูลใหม่ทุก 5
     // วินาทีระหว่างที่หน้าจอนี้เปิดอยู่ แล้วหยุดเองเมื่อออเดอร์ถึงสถานะจบแล้ว
+    // การ poll นี้ยังทำหน้าที่เช็คสถานะการจ่ายเงินซ้ำไปในตัวด้วย (ฝั่ง backend
+    // จะยืนยันกับ Omise ให้ทุกครั้งที่ GetOrder ถูกเรียกตอนยังรอจ่ายเงินอยู่)
     _poll = Timer.periodic(const Duration(seconds: 5), (_) => _load());
   }
 
@@ -62,19 +65,9 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(24),
                 children: [
-                  Center(
-                    child: Column(
-                      children: [
-                        const Text('รหัสรับอาหาร'),
-                        Text(
-                          order.code,
-                          style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, letterSpacing: 4),
-                        ),
-                        const SizedBox(height: 8),
-                        Chip(label: Text(OrderStatus.label(order.status))),
-                      ],
-                    ),
-                  ),
+                  order.status == OrderStatus.awaitingPayment
+                      ? _PaymentQRSection(order: order)
+                      : _PickupCodeSection(order: order),
                   const SizedBox(height: 24),
                   const Divider(),
                   for (final item in order.items)
@@ -98,6 +91,66 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// ส่วนหัวตอนออเดอร์ยังไม่จ่ายเงิน: QR PromptPay ให้สแกน — ไม่มีทางเลือกจ่าย
+/// เงินสดหน้าร้านแล้ว ต้องจ่ายผ่าน QR นี้ก่อน ร้านค้าถึงจะเห็นออเดอร์
+class _PaymentQRSection extends StatelessWidget {
+  final Order order;
+
+  const _PaymentQRSection({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Text('สแกน QR เพื่อชำระเงินผ่านแอปธนาคาร (PromptPay)', textAlign: TextAlign.center),
+        const SizedBox(height: 16),
+        Container(
+          width: 240,
+          height: 240,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
+          child: order.paymentQRCodeUri != null
+              ? Image.network(
+                  order.paymentQRCodeUri!,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Center(child: Icon(Icons.qr_code_2, size: 96)),
+                )
+              : const Center(child: Icon(Icons.qr_code_2, size: 96)),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          formatBaht(order.totalCents),
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Chip(label: Text(OrderStatus.label(order.status))),
+      ],
+    );
+  }
+}
+
+/// ส่วนหัวตอนออเดอร์จ่ายเงินแล้ว (หรือกำลังดำเนินการอยู่): รหัสรับอาหาร
+class _PickupCodeSection extends StatelessWidget {
+  final Order order;
+
+  const _PickupCodeSection({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Text('รหัสรับอาหาร'),
+        Text(
+          order.code,
+          style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, letterSpacing: 4),
+        ),
+        const SizedBox(height: 8),
+        Chip(label: Text(OrderStatus.label(order.status))),
+      ],
     );
   }
 }

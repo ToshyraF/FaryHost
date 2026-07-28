@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/ToshyraF/FaryHost/backend/internal/httpjson"
 	"github.com/ToshyraF/FaryHost/backend/internal/middleware"
 	"github.com/ToshyraF/FaryHost/backend/internal/models"
+	"github.com/ToshyraF/FaryHost/backend/internal/omise"
 )
 
 type createOrderItemRequest struct {
@@ -22,7 +25,8 @@ type createOrderRequest struct {
 // CreateOrder สั่งอาหารล่วงหน้า (pre-order) 1 ออเดอร์
 // จะตรวจสอบรายการสินค้าทุกชิ้นกับเมนูจริงของร้านค้า ณ ตอนนี้ แล้ว "snapshot"
 // ชื่อ/ราคาเก็บไว้ในออเดอร์ เพื่อไม่ให้การแก้เมนูภายหลังไปกระทบยอดเงินของ
-// ออเดอร์เก่าที่สั่งไปแล้ว
+// ออเดอร์เก่าที่สั่งไปแล้ว จากนั้นสร้างรายการเก็บเงินกับ Omise (PromptPay QR)
+// ก่อนบันทึกออเดอร์ — การจ่ายเงินเป็นการบังคับ ไม่มีตัวเลือกจ่ายเงินสดหน้าร้านแล้ว
 func (s *Server) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	claims, _ := middleware.ClaimsFromContext(r.Context())
 
@@ -76,13 +80,30 @@ func (s *Server) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// สร้างรายการเก็บเงินกับ Omise ก่อน แล้วค่อยบันทึกออเดอร์ลง store — ถ้า
+	// เรียก Omise ไม่สำเร็จ จะไม่มีออเดอร์ค้างอยู่ในระบบเลย (ไม่มี state ครึ่งๆ กลางๆ)
+	source, err := s.Omise.CreatePromptPaySource(total, s.Config.PaymentCurrency)
+	if err != nil {
+		log.Printf("omise: create source failed: %v", err)
+		httpjson.Error(w, http.StatusBadGateway, "could not start payment, please try again")
+		return
+	}
+	charge, err := s.Omise.CreateCharge(total, s.Config.PaymentCurrency, source.ID, "FaryHost order: "+vendor.Name)
+	if err != nil {
+		log.Printf("omise: create charge failed: %v", err)
+		httpjson.Error(w, http.StatusBadGateway, "could not start payment, please try again")
+		return
+	}
+
 	order := &models.Order{
-		CustomerID: claims.UserID,
-		VendorID:   vendor.ID,
-		Status:     models.OrderPending, // ออเดอร์ใหม่เริ่มที่สถานะ "รอร้านรับ" เสมอ
-		TotalCents: total,
-		Note:       req.Note,
-		Items:      orderItems,
+		CustomerID:       claims.UserID,
+		VendorID:         vendor.ID,
+		Status:           models.OrderAwaitingPayment, // ออเดอร์ใหม่รอลูกค้าจ่ายเงินก่อนเสมอ
+		TotalCents:       total,
+		Note:             req.Note,
+		Items:            orderItems,
+		PaymentChargeID:  charge.ID,
+		PaymentQRCodeURI: charge.Source.ScannableCode.Image.DownloadURI,
 	}
 	if err := s.Store.CreateOrder(order); err != nil {
 		httpjson.Error(w, http.StatusInternalServerError, "could not place order")
@@ -125,7 +146,76 @@ func (s *Server) GetOrder(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	// เผื่อ webhook จาก Omise มาไม่ถึง (เช่น รันในเครื่อง dev ที่ยังไม่ได้ตั้งค่า
+	// webhook URL สาธารณะ) หน้าจอสถานะออเดอร์ของลูกค้าจะ poll endpoint นี้อยู่
+	// แล้ว จึงถือโอกาสเช็คสถานะการจ่ายเงินซ้ำกับ Omise ตรงนี้ไปด้วยเลย
+	if order.Status == models.OrderAwaitingPayment {
+		order = s.confirmPayment(order)
+	}
 	httpjson.Write(w, http.StatusOK, order)
+}
+
+// confirmPayment เช็คสถานะการจ่ายเงินล่าสุดตรงกับ Omise (ไม่เชื่อข้อมูลจาก
+// ที่อื่น) แล้วเปลี่ยนสถานะออเดอร์ให้ตรงถ้าจ่ายเงินสำเร็จ/ล้มเหลว/หมดอายุ
+// เรียกได้ทั้งจาก GetOrder (polling fallback) และ OmiseWebhook (fast path)
+func (s *Server) confirmPayment(order *models.Order) *models.Order {
+	if order.PaymentChargeID == "" {
+		return order
+	}
+	charge, err := s.Omise.GetCharge(order.PaymentChargeID)
+	if err != nil {
+		log.Printf("omise: get charge %s failed: %v", order.PaymentChargeID, err)
+		return order
+	}
+
+	var nextStatus models.OrderStatus
+	switch charge.Status {
+	case omise.ChargeStatusSuccessful:
+		nextStatus = models.OrderPending
+	case omise.ChargeStatusFailed, omise.ChargeStatusExpired:
+		nextStatus = models.OrderCancelled
+	default:
+		return order // ยังรอลูกค้าจ่ายเงินอยู่ (pending) ไม่ต้องเปลี่ยนอะไร
+	}
+
+	updated, err := s.Store.UpdateOrderStatus(order.ID, nextStatus)
+	if err != nil {
+		log.Printf("omise: could not update order %s after payment confirmation: %v", order.ID, err)
+		return order
+	}
+	return updated
+}
+
+// OmiseWebhook รับ event จาก Omise ตอนสถานะการจ่ายเงินเปลี่ยน (public endpoint
+// เพราะ Omise เรียกเข้ามาเอง ไม่ได้แนบ JWT มาด้วย)
+//
+// สำคัญ: Omise ไม่มีลายเซ็นมาให้ตรวจสอบว่า request นี้มาจาก Omise จริงหรือถูก
+// ปลอมขึ้นมา (ต่างจาก Stripe's Stripe-Signature header) ดังนั้นห้ามเชื่อ
+// สถานะการจ่ายเงินจาก payload ตรงๆ เด็ดขาด handler นี้ใช้ payload แค่หา
+// charge ID แล้วเรียกกลับไปถาม Omise เองอีกที (ผ่าน confirmPayment) ก่อน
+// จะเปลี่ยนสถานะออเดอร์ใดๆ ทั้งสิ้น
+func (s *Server) OmiseWebhook(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	// ใช้ json.NewDecoder ตรงๆ แทน httpjson.Decode เพราะ payload จริงจาก Omise
+	// มี field เยอะกว่านี้มาก และเราตั้งใจสนใจแค่ charge ID เท่านั้น
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload.Data.ID == "" {
+		httpjson.Error(w, http.StatusBadRequest, "invalid webhook payload")
+		return
+	}
+
+	order, err := s.Store.GetOrderByChargeID(payload.Data.ID)
+	if err != nil {
+		// อาจเป็น event ที่ไม่เกี่ยวกับเรา ตอบ 200 ไปเฉยๆ ไม่ต้องให้ Omise ส่งซ้ำ
+		httpjson.Write(w, http.StatusOK, nil)
+		return
+	}
+	s.confirmPayment(order)
+	httpjson.Write(w, http.StatusOK, nil)
 }
 
 type updateOrderStatusRequest struct {

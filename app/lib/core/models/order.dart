@@ -29,7 +29,8 @@ class OrderItem {
 /// คัดลอกมาจาก backend/internal/models.OrderStatus/NextStatuses ด้วยมือ
 /// (ไม่มี code generation) ถ้าฝั่ง backend แก้ ต้องมาแก้ที่นี่ด้วยให้ตรงกัน
 class OrderStatus {
-  static const pending = 'pending'; // ลูกค้าสั่งแล้ว รอร้านค้ากดรับ
+  static const awaitingPayment = 'awaiting_payment'; // สร้างออเดอร์แล้ว รอลูกค้าสแกน QR จ่ายเงิน
+  static const pending = 'pending'; // จ่ายเงินสำเร็จแล้ว รอร้านค้ากดรับ
   static const accepted = 'accepted'; // ร้านค้ารับออเดอร์แล้ว
   static const preparing = 'preparing'; // กำลังทำอาหาร
   static const ready = 'ready'; // พร้อมให้มารับ
@@ -38,7 +39,12 @@ class OrderStatus {
 
   /// จากสถานะปัจจุบัน (key) ร้านค้าเปลี่ยนไปสถานะไหนต่อได้บ้าง (value)
   /// ต้องตรงกับ backend/internal/models.NextStatuses เป๊ะๆ
+  ///
+  /// awaitingPayment -> pending ไม่ใช่การกระทำของร้านค้า (ระบบเปลี่ยนให้เอง
+  /// อัตโนมัติทันทีที่ backend ยืนยันกับ Omise ได้ว่าจ่ายเงินสำเร็จ) จึงไม่มี
+  /// ปุ่มให้กดในแอปฝั่งร้านค้า มีแค่ปุ่มยกเลิกออเดอร์ที่ยังไม่จ่ายเงินเท่านั้น
   static const Map<String, List<String>> nextStatuses = {
+    awaitingPayment: [cancelled],
     pending: [accepted, cancelled],
     accepted: [preparing, cancelled],
     preparing: [ready, cancelled],
@@ -48,6 +54,8 @@ class OrderStatus {
   /// แปลงสถานะเป็นข้อความภาษาไทยให้ผู้ใช้อ่านเข้าใจง่าย
   static String label(String status) {
     switch (status) {
+      case awaitingPayment:
+        return 'รอชำระเงิน';
       case pending:
         return 'รอร้านรับออเดอร์';
       case accepted:
@@ -67,6 +75,8 @@ class OrderStatus {
 }
 
 /// คำสั่งซื้อ 1 ออเดอร์ (สั่งได้ทีละร้านค้าเดียวเท่านั้น)
+/// การจ่ายเงินเป็นแบบบังคับผ่าน Omise PromptPay QR ไม่มีทางเลือกจ่ายเงินสด
+/// หน้าร้านแล้ว
 class Order {
   final String id;
   final String code; // รหัสสั้นๆ ที่ลูกค้าโชว์หน้าร้านตอนมารับอาหาร
@@ -76,6 +86,7 @@ class Order {
   final int totalCents;
   final String? note;
   final List<OrderItem> items;
+  final String? paymentQRCodeUri; // มีค่าเฉพาะตอนสถานะเป็น OrderStatus.awaitingPayment
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -90,6 +101,7 @@ class Order {
     required this.createdAt,
     required this.updatedAt,
     this.note,
+    this.paymentQRCodeUri,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -104,6 +116,7 @@ class Order {
       items: (json['items'] as List<dynamic>? ?? [])
           .map((e) => OrderItem.fromJson(e as Map<String, dynamic>))
           .toList(),
+      paymentQRCodeUri: json['payment_qr_code_uri'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
