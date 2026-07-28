@@ -5,10 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A pre-order/pickup app for food stalls in a flea/night market. Vendors set
-up a stall and menu; customers browse stalls and place a pre-order; the
-vendor moves the order through a status pipeline; the customer shows a
-pickup code at the stall to collect it. Payment is cash on pickup — there
-is no payment gateway integration.
+up a stall and menu; customers browse stalls and place a pre-order; payment
+is mandatory upfront via Omise (Opn Payments) PromptPay QR — the order only
+reaches the vendor once payment is confirmed; the vendor then moves it
+through a status pipeline; the customer shows a pickup code at the stall to
+collect it.
 
 Two components:
 - `backend/` — Go HTTP API.
@@ -65,6 +66,13 @@ apply to *your* environment:
   `app/test/golden` has golden (screenshot) tests, but their reference PNGs
   don't exist yet either — see `app/README.md`'s "Golden tests" section for
   how to generate and review them once you have Flutter installed.
+- **The Omise payment integration hasn't been tested against the live API**
+  either — no network access to `api.omise.co` here. `internal/omise` was
+  verified as far as this sandbox allows (builds, and a local run confirmed
+  `CreateOrder` fails cleanly with nothing persisted when Omise is
+  unreachable); a real charge actually clearing needs testing somewhere
+  with network access and a real Omise test key. See "Payments" in
+  `backend/README.md`.
 
 If you're working in an environment where these constraints don't apply
 (network access to the module proxy, Flutter SDK installed), fixing any of
@@ -90,9 +98,10 @@ fires on an existing-but-mismatched golden, not a missing one.
 
 Layered, single binary, no framework:
 - `cmd/api/main.go` — wires the `ServeMux`, builds the auth/vendor/customer middleware chains, starts the server.
-- `internal/models` — domain types (`User`, `Vendor`, `MenuItem`, `Order`, `OrderItem`) and `NextStatuses`, the order status state machine (`pending -> accepted -> preparing -> ready -> completed`, or `cancelled` from any non-terminal state). `internal/handlers` and the Flutter app's `OrderStatus` both key off this map — changing it means updating both.
+- `internal/models` — domain types (`User`, `Vendor`, `MenuItem`, `Order`, `OrderItem`) and `NextStatuses`, the order status state machine (`awaiting_payment -> pending -> accepted -> preparing -> ready -> completed`, or `cancelled` from any non-terminal state). `internal/handlers` and the Flutter app's `OrderStatus` both key off this map — changing it means updating both.
 - `internal/store` — in-memory data (see constraints above).
-- `internal/handlers` — one file per resource (`auth.go`, `vendor.go`, `order.go`), each a method on `*Server` (holds `*store.Store` + `config.Config`).
+- `internal/omise` — hand-rolled REST client for Omise (Opn Payments): create a PromptPay source, create a charge against it, fetch a charge's current status. No SDK, same reasoning as everything else under "zero external dependencies" above.
+- `internal/handlers` — one file per resource (`auth.go`, `vendor.go`, `order.go`), each a method on `*Server` (holds `*store.Store` + `config.Config` + `*omise.Client`).
 - `internal/middleware` — `RequireAuth` (parses the bearer JWT into request context) and `RequireRole` compose per-route in `main.go`; `Logging` and `CORS` wrap the whole mux.
 - `internal/authutil`, `internal/idgen`, `internal/httpjson`, `internal/config` — small stdlib-only support packages.
 
@@ -101,7 +110,9 @@ Route summary is kept in `backend/README.md` (method/path/auth table) — update
 Domain rules worth knowing before touching `internal/handlers`:
 - One stall per vendor user (`store.CreateVendor` returns `ErrConflict` on a second attempt).
 - Placing an order snapshots each menu item's name/price into `OrderItem` at order time, so later menu edits don't retroactively change past orders' totals.
-- A vendor can only ever move an order to a status listed in `models.NextStatuses[currentStatus]`; `handlers.isAllowedTransition` enforces this and returns 409 otherwise.
+- Payment is mandatory and happens before the vendor ever sees the order: `CreateOrder` creates an Omise PromptPay source+charge *before* persisting anything (if Omise fails, nothing is saved — no half-created orders), and the order starts at `awaiting_payment`. The `awaiting_payment -> pending` transition is never vendor-initiated — it's driven by `handlers.confirmPayment`, called from both `OmiseWebhook` (fast path) and `GetOrder` (polling fallback, since webhooks need a public URL that local/dev setups usually don't have). **`confirmPayment` always re-queries Omise directly for the charge's real status — it never trusts the webhook payload**, because Omise (unlike Stripe) has no signature header to authenticate that a webhook POST actually came from Omise.
+- A vendor can only ever move an order to a status listed in `models.NextStatuses[currentStatus]`; `handlers.isAllowedTransition` enforces this and returns 409 otherwise. The one exception is the system-driven `awaiting_payment -> pending` transition above, which bypasses this check entirely (it calls `store.UpdateOrderStatus` directly, not through the vendor-facing handler).
+- Needs `OMISE_SECRET_KEY` set to actually create charges (get a test-mode key by signing up at Opn Payments — no approval wait). Without it, `CreateOrder` will fail every time with a 502, since a request signed with an empty secret key is rejected by Omise. This has not been tested against the real Omise API in this sandbox — no network access to `api.omise.co` here; see `backend/README.md`.
 
 ## Flutter app architecture (`app/`)
 
@@ -109,6 +120,6 @@ Domain rules worth knowing before touching `internal/handlers`:
 - `lib/core/state` — `AuthState` and `CartState`, both `ChangeNotifier` via `provider`. `AuthState` persists the JWT + user via `shared_preferences` and restores the session on launch. `CartState` holds lines for exactly one vendor at a time (an order can only be placed with one stall); adding an item from a different vendor clears the cart first.
 - `lib/core/models` mirror the backend's JSON by hand (no codegen). `lib/core/models/order.dart`'s `OrderStatus` constants and `nextStatuses` map are a manual copy of `backend/internal/models.OrderStatus`/`NextStatuses` — keep them in sync.
 - `main.dart`'s `AuthGate` is the only role-based routing: not logged in -> `WelcomeScreen` (branded entry point offering login or register); logged in as vendor -> `VendorDashboardScreen`; logged in as customer -> `VendorListScreen`.
-- `lib/features/customer` — stall list -> stall menu (add to cart) -> cart/checkout -> order status (polls the order every 5s until it's `completed`/`cancelled`) -> order history.
+- `lib/features/customer` — stall list -> stall menu (add to cart) -> cart/checkout (`CreateOrder` always returns `awaiting_payment`) -> order status, which shows a PromptPay QR to scan while `awaiting_payment` and switches to the pickup code once payment clears (polls every 5s, which doubles as the payment-status poll — see backend notes above) -> order history.
 - `lib/features/vendor` — `VendorDashboardScreen` gates on whether the vendor has created a stall yet (`getMyVendor() == null` shows a setup form instead of the dashboard); once set up, its two tabs (`VendorOrdersTab`, `MenuManagementTab`) are plain widgets embedded via `TabBarView`, not full-screen routes.
 - The app bundles a Thai-capable font (`assets/fonts/Loma*.otf`, set as `ThemeData(fontFamily: 'Loma')` in `lib/core/theme.dart`'s `buildAppTheme()`, shared by `main.dart` and the test harness) since nearly all UI text is Thai. `test/flutter_test_config.dart` loads the same font before tests run — `flutter_tester` has no real fonts otherwise, so every golden screenshot would be blank boxes instead of readable text.

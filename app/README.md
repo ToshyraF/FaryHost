@@ -40,8 +40,20 @@ script has not actually been run — see "Status" below.
 - `lib/core/api_client.dart` — the only place that talks HTTP; every screen goes through it. Takes an optional `client: http.Client` so tests can swap in `package:http/testing.dart`'s `MockClient` instead of hitting the network.
 - `lib/core/state` — `AuthState` (session + token persistence via `shared_preferences`) and `CartState` (single-vendor cart, since an order belongs to one stall) as `ChangeNotifier`s via `provider`.
 - `lib/features/auth` — welcome (shown first, before login) / login / register.
-- `lib/features/customer` — stall list, stall menu + add to cart, cart/checkout, order status (polls every 5s while open), order history.
+- `lib/features/customer` — stall list, stall menu + add to cart, cart/checkout (payment is mandatory — `CreateOrder` always comes back `awaiting_payment`), order status (shows a PromptPay QR while `awaiting_payment`, switches to the pickup code once paid; polls every 5s, which doubles as the payment-status check), order history.
 - `lib/features/vendor` — stall setup, orders tab (accept/prepare/ready/complete, polls every 8s), menu management tab.
+
+## Payment
+
+Payment is mandatory and happens before the vendor ever sees the order —
+there's no cash-on-pickup option. `CreateOrder` always returns an order at
+`OrderStatus.awaitingPayment` with `paymentQRCodeUri` set to a PromptPay QR
+code image (from the backend's Omise integration — see
+`backend/README.md`'s Payments section for the full flow and the security
+note on why webhook payloads are never trusted directly).
+`OrderStatusScreen` shows that QR and keeps polling every 5s; once the
+backend confirms payment with Omise, the same poll picks up the status
+flip to `pending` and switches to the normal pickup-code view.
 
 ## Font
 
@@ -60,8 +72,9 @@ golden screenshot would show blank boxes instead of the actual Thai text.
 
 `test/golden/` has widget-level golden (screenshot) tests for the screens
 that render meaningfully without a live backend: welcome, login, register,
-cart (empty + with items), the vendor list, order status, and the vendor
-create-stall form. Screens that need data mock the network via
+cart (empty + with items), the vendor list, order status (both the
+awaiting-payment QR view and the post-payment pickup-code view), and the
+vendor create-stall form. Screens that need data mock the network via
 `package:http/testing.dart`'s `MockClient` (see
 `vendor_list_screen_test.dart`, `order_status_screen_test.dart`,
 `vendor_create_stall_screen_test.dart` for the pattern) — `test_helpers.dart`'s
