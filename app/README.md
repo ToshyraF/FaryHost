@@ -18,6 +18,13 @@ flutter pub get
 flutter run
 ```
 
+Or run `scripts/run_dev.sh` from the repo root — it starts the backend,
+runs `flutter create .` if the platform folders don't exist yet, then
+`flutter pub get` and `flutter run` (pass device flags through, e.g.
+`scripts/run_dev.sh -d chrome`). Requires Go and Flutter/Dart installed
+locally; neither is available in the sandbox this was written in, so this
+script has not actually been run — see "Status" below.
+
 ## Pointing at the backend
 
 `ApiClient` (`lib/core/api_client.dart`) defaults to
@@ -39,6 +46,8 @@ flutter run
 ## Status
 
 Written and reviewed for consistency against the backend's request/response
-shapes, but this environment has no Flutter/Dart SDK, so `flutter analyze`
-and `flutter run` have not actually been run against this code. Treat it as
-unverified until you run it locally.
+shapes, but this environment has no Flutter/Dart SDK — and its network
+policy blocks both the SDK download host (`storage.googleapis.com`) and
+`pub.dev` — so `flutter analyze` and `flutter run` have not actually been
+run against this code. Treat it as unverified until you run it locally with
+`scripts/run_dev.sh` or the manual steps above.

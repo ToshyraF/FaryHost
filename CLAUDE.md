@@ -32,13 +32,16 @@ flutter create . --project-name faryhost_app   # one-time: generates android/, i
 flutter pub get
 flutter run
 ```
+Or `scripts/run_dev.sh` from the repo root: starts the backend, runs `flutter create .` if needed, then `flutter pub get` and `flutter run` (forwards args, e.g. `-d chrome`).
 
 ## Sandbox constraints that shaped this codebase
 
 Both halves were built in an environment whose network policy blocks the Go
-module proxy (`proxy.golang.org`) and has no Flutter/Dart SDK installed.
-These aren't incidental — they explain deliberate choices below, and they
-may or may not apply to *your* environment:
+module proxy (`proxy.golang.org`) and has no Flutter/Dart SDK installed —
+nor can one be installed, since the same policy also blocks the SDK's
+download host (`storage.googleapis.com`) and `pub.dev`. These aren't
+incidental — they explain deliberate choices below, and they may or may not
+apply to *your* environment:
 
 - **`backend/go.mod` has zero external dependencies.** Routing uses
   `net/http`'s Go 1.22+ `ServeMux` instead of chi/gorilla; JWT and password
