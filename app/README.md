@@ -39,7 +39,7 @@ script has not actually been run — see "Status" below.
 - `lib/core/models` — plain Dart classes mirroring the backend's JSON (`User`, `Vendor`, `MenuItem`, `Order`). Keep `OrderStatus` in `lib/core/models/order.dart` in sync with `backend/internal/models/models.go` if the status machine changes.
 - `lib/core/api_client.dart` — the only place that talks HTTP; every screen goes through it. Takes an optional `client: http.Client` so tests can swap in `package:http/testing.dart`'s `MockClient` instead of hitting the network.
 - `lib/core/state` — `AuthState` (session + token persistence via `shared_preferences`) and `CartState` (single-vendor cart, since an order belongs to one stall) as `ChangeNotifier`s via `provider`.
-- `lib/features/auth` — login/register.
+- `lib/features/auth` — welcome (shown first, before login) / login / register.
 - `lib/features/customer` — stall list, stall menu + add to cart, cart/checkout, order status (polls every 5s while open), order history.
 - `lib/features/vendor` — stall setup, orders tab (accept/prepare/ready/complete, polls every 8s), menu management tab.
 
@@ -59,8 +59,8 @@ golden screenshot would show blank boxes instead of the actual Thai text.
 ## Golden tests
 
 `test/golden/` has widget-level golden (screenshot) tests for the screens
-that render meaningfully without a live backend: login, register, cart
-(empty + with items), the vendor list, order status, and the vendor
+that render meaningfully without a live backend: welcome, login, register,
+cart (empty + with items), the vendor list, order status, and the vendor
 create-stall form. Screens that need data mock the network via
 `package:http/testing.dart`'s `MockClient` (see
 `vendor_list_screen_test.dart`, `order_status_screen_test.dart`,
