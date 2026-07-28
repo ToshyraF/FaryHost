@@ -70,17 +70,19 @@ regression. Golden images are OS/Flutter-version sensitive; regenerate them
 if you change Flutter version or run CI on a different OS than local dev.
 
 **Don't have Flutter locally either?** `.github/workflows/ci.yml`'s `flutter`
-job runs `flutter test` on every push/PR. Since no golden PNGs are committed
-yet, that step is *expected to fail* the first time — but `flutter_test`
-automatically renders the actual output of every failing/missing golden
-comparison into a `failures/` folder next to the test, and the workflow
-uploads that folder as the `golden-test-failures` artifact regardless of
-pass/fail. Download it from the workflow run's Summary page, eyeball the
-rendered screenshots, and if they look right, either copy them into
-`test/golden/*/goldens/` yourself or run `flutter test --update-goldens`
-locally once you have Flutter — then commit. Don't treat this failure as a
-bug to silence (e.g. by making the step `continue-on-error`); a real
-regression later needs this check to still be able to go red.
+job runs `flutter test` on every push/PR — that step is *expected to fail*
+until golden PNGs are committed, and that's fine; it's the real check, and a
+future regression needs it to still be able to go red (don't "fix" this by
+adding `continue-on-error`). Right after it, a separate `flutter test
+--update-goldens` step renders every golden image fresh regardless of
+whether the strict step passed, and the workflow uploads them as the
+`golden-test-renders` artifact. Download it from the workflow run's Summary
+page, eyeball the screenshots, and if they look right, copy them into
+`test/golden/*/goldens/` and commit — from then on, plain `flutter test`
+will catch real regressions. (`flutter_test`'s own automatic `failures/`
+diff output only kicks in when a reference image already exists but doesn't
+match; it stays empty while there's no baseline at all, which is why the
+explicit `--update-goldens` step is needed here.)
 
 ## Status
 

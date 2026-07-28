@@ -61,18 +61,27 @@ jobs:
 
       # เทสนี้รวม golden test ด้วย — ครั้งแรกที่รัน "คาดว่าจะแดง" เพราะยังไม่มี
       # ไฟล์ภาพอ้างอิง (test/golden/goldens/*.png) ถูก commit ไว้เลย
-      # ดู step ถัดไปที่พ่นภาพที่ render จริงออกมาเป็น artifact ให้ตรวจสอบ
+      #
+      # หมายเหตุ: flutter_test จะเขียนภาพ diff ลงโฟลเดอร์ failures/ ให้เอง
+      # อัตโนมัติ "เฉพาะตอนที่มีไฟล์อ้างอิงอยู่แล้วแต่ภาพไม่ตรง" เท่านั้น —
+      # ถ้าไฟล์อ้างอิงยังไม่มีอยู่เลย (กรณีนี้) มันจะแค่ throw error เฉยๆ
+      # ไม่เขียนภาพอะไรออกมาให้ ต้องใช้ step ถัดไปที่รันด้วย --update-goldens
+      # เพื่อบังคับให้ render ภาพออกมาเป็นไฟล์จริงสำหรับดูตรวจสอบ
       - name: flutter test
         run: flutter test
 
-      # flutter_test เขียนภาพที่ render จริง (และ diff ถ้ามีไฟล์อ้างอิงเดิมอยู่)
-      # ลงโฟลเดอร์ failures/ ข้างๆ ไฟล์เทสโดยอัตโนมัติทุกครั้งที่ golden ไม่ตรง
-      # หรือไฟล์อ้างอิงยังไม่มี — อัปโหลดโฟลเดอร์นั้นเป็น artifact ให้ดาวน์โหลด
-      # มาตรวจก่อนตัดสินใจ commit เป็นภาพอ้างอิงจริง
-      - name: Upload golden test failure images
+      - name: Render current golden images for review
+        if: always()
+        run: flutter test --update-goldens
+
+      # อัปโหลดภาพที่ render ได้ (ทั้งกรณีเทสผ่านหรือไม่ผ่านก็ตาม) เป็น artifact
+      # ให้ดาวน์โหลดมาดูก่อนตัดสินใจ copy เข้า test/golden/*/goldens/ แล้ว commit
+      # เป็นไฟล์อ้างอิงจริง (สถานะ pass/fail ของ step "flutter test" ด้านบน
+      # ยังคงเป็นตัวบอกผลจริงของ job นี้ ไม่ได้ถูกบดบังโดย step นี้)
+      - name: Upload golden test renders
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golden-test-failures
-          path: app/test/**/failures/**
+          name: golden-test-renders
+          path: app/test/**/goldens/**
           if-no-files-found: ignore

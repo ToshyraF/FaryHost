@@ -77,12 +77,14 @@ Two jobs, both running on GitHub's hosted runners (which have neither
 constraint above): `backend` runs `go build`/`go vet`/`gofmt -l`/`go test`;
 `flutter` runs `flutter pub get`/`flutter analyze` (non-blocking)/`flutter
 test`. Until the golden tests' reference PNGs are committed (see
-`app/README.md`), the `flutter test` step is *expected* to fail — the
-workflow uploads whatever `flutter_test` renders for the failing/missing
-comparisons as the `golden-test-failures` artifact so a human can review
-and promote them to `app/test/golden/*/goldens/`. Don't "fix" that failure
-by adding `continue-on-error`; it's supposed to stay a real check once
-goldens exist.
+`app/README.md`), the `flutter test` step is *expected* to fail — don't
+"fix" that by adding `continue-on-error`; it's supposed to stay a real
+check once goldens exist. A following `flutter test --update-goldens` step
+(runs regardless of whether the strict step passed) renders every golden
+image fresh, uploaded as the `golden-test-renders` artifact for a human to
+review and promote into `app/test/golden/*/goldens/`. This extra step
+exists because `flutter_test`'s automatic `failures/` diff output only
+fires on an existing-but-mismatched golden, not a missing one.
 
 ## Backend architecture (`backend/`)
 
