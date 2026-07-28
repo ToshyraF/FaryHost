@@ -7,6 +7,8 @@ import '../../core/api_client.dart';
 import '../../core/format.dart';
 import '../../core/models/order.dart';
 
+/// หน้าจอติดตามสถานะออเดอร์ 1 รายการ พร้อมโชว์รหัสรับอาหารตัวใหญ่ๆ
+/// ให้ลูกค้าเอาไปยื่นให้ร้านค้าตอนไปรับของ
 class OrderStatusScreen extends StatefulWidget {
   final String orderId;
 
@@ -24,8 +26,8 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
   void initState() {
     super.initState();
     _load();
-    // Cheap live-status effect without websockets: poll while this screen
-    // is open, stop once the order reaches a terminal state.
+    // ทำ "live status" แบบประหยัดๆ โดยไม่ต้องใช้ websocket: ดึงข้อมูลใหม่ทุก 5
+    // วินาทีระหว่างที่หน้าจอนี้เปิดอยู่ แล้วหยุดเองเมื่อออเดอร์ถึงสถานะจบแล้ว
     _poll = Timer.periodic(const Duration(seconds: 5), (_) => _load());
   }
 
@@ -44,7 +46,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
         _poll?.cancel();
       }
     } catch (_) {
-      // Keep showing the last known state; the next tick will retry.
+      // เน็ตหลุดชั่วคราวก็ไม่เป็นไร โชว์ข้อมูลล่าสุดที่มีไปก่อน รอบถัดไปจะลองใหม่เอง
     }
   }
 

@@ -8,6 +8,7 @@ import '../../core/models/vendor.dart';
 import '../../core/state/cart_state.dart';
 import 'cart_screen.dart';
 
+/// หน้าเมนูของร้านค้า 1 ร้าน — ลูกค้ากดเพิ่มเมนูลงตะกร้าจากหน้านี้
 class VendorMenuScreen extends StatefulWidget {
   final String vendorId;
 
@@ -26,6 +27,8 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
     _detailFuture = context.read<ApiClient>().getVendorDetail(widget.vendorId);
   }
 
+  /// เพิ่มเมนูลงตะกร้า ถ้าตะกร้าเดิมเป็นของร้านอื่นอยู่ (CartState จะล้างให้เอง)
+  /// จะแจ้งเตือนให้ลูกค้ารู้ว่าตะกร้าเก่าถูกล้างไปแล้ว
   void _addToCart(VendorDetail vendor, MenuItem item) {
     final cart = context.read<CartState>();
     final switchedVendor = cart.belongsToOtherVendor(vendor.id);
@@ -89,6 +92,7 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
                         if (!item.isAvailable) 'หมดชั่วคราว',
                       ].join(' · '),
                     ),
+                    // กดเพิ่มลงตะกร้าได้เฉพาะตอนร้านเปิดและเมนูยังมีขายอยู่เท่านั้น
                     trailing: (vendor.isOpen && item.isAvailable)
                         ? IconButton(
                             icon: const Icon(Icons.add_circle),
@@ -103,6 +107,7 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
           );
         },
       ),
+      // แถบล่างโชว์ตะกร้าแบบลอย จะขึ้นก็ต่อเมื่อตะกร้ามีของและเป็นของร้านนี้เท่านั้น
       bottomNavigationBar: Consumer<CartState>(
         builder: (context, cart, _) {
           if (cart.isEmpty || cart.vendorId != widget.vendorId) return const SizedBox.shrink();

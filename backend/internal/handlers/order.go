@@ -19,9 +19,10 @@ type createOrderRequest struct {
 	Items    []createOrderItemRequest `json:"items"`
 }
 
-// CreateOrder places a pre-order for pickup: it validates every line item
-// against the vendor's live menu and snapshots name/price so later menu
-// edits don't change historical orders.
+// CreateOrder สั่งอาหารล่วงหน้า (pre-order) 1 ออเดอร์
+// จะตรวจสอบรายการสินค้าทุกชิ้นกับเมนูจริงของร้านค้า ณ ตอนนี้ แล้ว "snapshot"
+// ชื่อ/ราคาเก็บไว้ในออเดอร์ เพื่อไม่ให้การแก้เมนูภายหลังไปกระทบยอดเงินของ
+// ออเดอร์เก่าที่สั่งไปแล้ว
 func (s *Server) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	claims, _ := middleware.ClaimsFromContext(r.Context())
 
@@ -45,6 +46,8 @@ func (s *Server) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// วนตรวจแต่ละรายการที่ลูกค้าเลือก: ต้องเป็นเมนูของร้านนี้จริง ต้องยังมีขายอยู่
+	// แล้วคำนวณราคารวมไปพร้อมกัน (snapshot ชื่อ/ราคา ณ ตอนสั่งไว้ในแต่ละรายการ)
 	orderItems := make([]models.OrderItem, 0, len(req.Items))
 	var total int64
 	for _, reqItem := range req.Items {
@@ -76,7 +79,7 @@ func (s *Server) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	order := &models.Order{
 		CustomerID: claims.UserID,
 		VendorID:   vendor.ID,
-		Status:     models.OrderPending,
+		Status:     models.OrderPending, // ออเดอร์ใหม่เริ่มที่สถานะ "รอร้านรับ" เสมอ
 		TotalCents: total,
 		Note:       req.Note,
 		Items:      orderItems,
@@ -88,11 +91,13 @@ func (s *Server) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusCreated, order)
 }
 
+// ListMyOrders คืนประวัติการสั่งอาหารของลูกค้าที่ login อยู่
 func (s *Server) ListMyOrders(w http.ResponseWriter, r *http.Request) {
 	claims, _ := middleware.ClaimsFromContext(r.Context())
 	httpjson.Write(w, http.StatusOK, s.Store.ListOrdersByCustomer(claims.UserID))
 }
 
+// ListVendorOrders คืนออเดอร์ที่เข้ามาที่ร้านค้าของ vendor user ที่ login อยู่
 func (s *Server) ListVendorOrders(w http.ResponseWriter, r *http.Request) {
 	vendor, ok := s.myVendorOrError(w, r)
 	if !ok {
@@ -101,8 +106,9 @@ func (s *Server) ListVendorOrders(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, s.Store.ListOrdersByVendor(vendor.ID))
 }
 
-// GetOrder is reachable by the customer who placed it or the vendor who
-// owns it.
+// GetOrder ดูรายละเอียดออเดอร์ 1 รายการ เข้าถึงได้แค่ 2 ฝ่าย: ลูกค้าที่สั่ง
+// หรือร้านค้าเจ้าของออเดอร์นั้น (ฝ่ายอื่นจะได้ 404 เหมือนไม่มีออเดอร์นี้อยู่จริง
+// เพื่อไม่ให้รู้ด้วยซ้ำว่าออเดอร์นี้มีตัวตน)
 func (s *Server) GetOrder(w http.ResponseWriter, r *http.Request) {
 	claims, _ := middleware.ClaimsFromContext(r.Context())
 
@@ -126,6 +132,9 @@ type updateOrderStatusRequest struct {
 	Status string `json:"status"`
 }
 
+// UpdateOrderStatus ให้ร้านค้าเปลี่ยนสถานะออเดอร์ (เช่น กดรับออเดอร์, กำลังทำ,
+// พร้อมรับ, เสร็จสิ้น) โดยต้องเป็นออเดอร์ของร้านตัวเอง และเปลี่ยนได้เฉพาะสถานะ
+// ที่อนุญาตตาม models.NextStatuses เท่านั้น (ห้ามข้ามขั้นตอน)
 func (s *Server) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
 	vendor, ok := s.myVendorOrError(w, r)
 	if !ok {
@@ -158,6 +167,8 @@ func (s *Server) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, updated)
 }
 
+// isAllowedTransition เช็คว่าเปลี่ยนจากสถานะ from ไปสถานะ to ได้ไหม
+// โดยดูจากตาราง models.NextStatuses (ตัวเดียวกับที่ฝั่ง Flutter ใช้)
 func isAllowedTransition(from, to models.OrderStatus) bool {
 	for _, allowed := range models.NextStatuses[from] {
 		if allowed == to {

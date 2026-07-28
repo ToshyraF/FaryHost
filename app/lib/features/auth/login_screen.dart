@@ -5,6 +5,7 @@ import '../../core/api_exception.dart';
 import '../../core/state/auth_state.dart';
 import 'register_screen.dart';
 
+/// หน้าจอเข้าสู่ระบบ (จุดเริ่มต้นของแอปตอนยังไม่ login ดู main.dart's AuthGate)
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -26,6 +27,8 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// ยิง login ไปที่ backend ผ่าน AuthState เมื่อสำเร็จ AuthGate จะสลับหน้าจอ
+  /// ให้เองอัตโนมัติ (เพราะ AuthState เป็น ChangeNotifier ที่ AuthGate ฟังอยู่)
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {

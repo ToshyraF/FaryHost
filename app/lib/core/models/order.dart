@@ -1,3 +1,5 @@
+/// รายการสินค้า 1 ชิ้นในออเดอร์ — ชื่อ/ราคาเป็น "snapshot" ณ ตอนสั่ง
+/// (ไม่ใช่ราคาปัจจุบันของเมนู) เพื่อให้ตรงกับยอดเงินที่ลูกค้าจ่ายจริงตอนนั้น
 class OrderItem {
   final String menuItemId;
   final String nameSnapshot;
@@ -24,17 +26,18 @@ class OrderItem {
   }
 }
 
-/// Mirrors backend/internal/models.OrderStatus. Keep in sync with
-/// backend/internal/models/models.go.
+/// คัดลอกมาจาก backend/internal/models.OrderStatus/NextStatuses ด้วยมือ
+/// (ไม่มี code generation) ถ้าฝั่ง backend แก้ ต้องมาแก้ที่นี่ด้วยให้ตรงกัน
 class OrderStatus {
-  static const pending = 'pending';
-  static const accepted = 'accepted';
-  static const preparing = 'preparing';
-  static const ready = 'ready';
-  static const completed = 'completed';
-  static const cancelled = 'cancelled';
+  static const pending = 'pending'; // ลูกค้าสั่งแล้ว รอร้านค้ากดรับ
+  static const accepted = 'accepted'; // ร้านค้ารับออเดอร์แล้ว
+  static const preparing = 'preparing'; // กำลังทำอาหาร
+  static const ready = 'ready'; // พร้อมให้มารับ
+  static const completed = 'completed'; // รับของแล้ว (จบ)
+  static const cancelled = 'cancelled'; // ยกเลิก (จบ)
 
-  /// Mirrors backend/internal/models.NextStatuses.
+  /// จากสถานะปัจจุบัน (key) ร้านค้าเปลี่ยนไปสถานะไหนต่อได้บ้าง (value)
+  /// ต้องตรงกับ backend/internal/models.NextStatuses เป๊ะๆ
   static const Map<String, List<String>> nextStatuses = {
     pending: [accepted, cancelled],
     accepted: [preparing, cancelled],
@@ -42,6 +45,7 @@ class OrderStatus {
     ready: [completed],
   };
 
+  /// แปลงสถานะเป็นข้อความภาษาไทยให้ผู้ใช้อ่านเข้าใจง่าย
   static String label(String status) {
     switch (status) {
       case pending:
@@ -62,9 +66,10 @@ class OrderStatus {
   }
 }
 
+/// คำสั่งซื้อ 1 ออเดอร์ (สั่งได้ทีละร้านค้าเดียวเท่านั้น)
 class Order {
   final String id;
-  final String code;
+  final String code; // รหัสสั้นๆ ที่ลูกค้าโชว์หน้าร้านตอนมารับอาหาร
   final String customerId;
   final String vendorId;
   final String status;

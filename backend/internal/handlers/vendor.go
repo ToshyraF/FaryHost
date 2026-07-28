@@ -15,11 +15,11 @@ type vendorRequest struct {
 	Description string `json:"description"`
 	StallNumber string `json:"stall_number"`
 	MarketZone  string `json:"market_zone"`
-	IsOpen      *bool  `json:"is_open"`
+	IsOpen      *bool  `json:"is_open"` // pointer เพื่อแยกได้ว่า "ไม่ได้ส่งค่ามา" กับ "ส่งค่า false มา"
 }
 
-// CreateVendor sets up the stall profile for the authenticated vendor user.
-// Each vendor user may own exactly one stall.
+// CreateVendor ตั้งค่าโปรไฟล์ร้านค้าให้กับ vendor user ที่ login อยู่
+// vendor user แต่ละคนเปิดร้านได้แค่ 1 ร้านเท่านั้น
 func (s *Server) CreateVendor(w http.ResponseWriter, r *http.Request) {
 	claims, _ := middleware.ClaimsFromContext(r.Context())
 
@@ -39,7 +39,7 @@ func (s *Server) CreateVendor(w http.ResponseWriter, r *http.Request) {
 		Description: req.Description,
 		StallNumber: req.StallNumber,
 		MarketZone:  req.MarketZone,
-		IsOpen:      true,
+		IsOpen:      true, // ร้านใหม่เปิดรับออเดอร์ทันทีโดย default
 	}
 	if err := s.Store.CreateVendor(vendor); err != nil {
 		if errors.Is(err, store.ErrConflict) {
@@ -52,6 +52,9 @@ func (s *Server) CreateVendor(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusCreated, vendor)
 }
 
+// GetMyVendor คืนร้านค้าของ vendor user ที่ login อยู่
+// ฝั่ง Flutter ใช้ endpoint นี้เช็คว่าร้านค้าเคยตั้งค่าไว้หรือยัง
+// (ถ้ายังไม่มี = แสดงฟอร์มตั้งค่าร้านแทน dashboard)
 func (s *Server) GetMyVendor(w http.ResponseWriter, r *http.Request) {
 	claims, _ := middleware.ClaimsFromContext(r.Context())
 
@@ -63,6 +66,7 @@ func (s *Server) GetMyVendor(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, vendor)
 }
 
+// UpdateMyVendor แก้ไขข้อมูลร้านค้า (ชื่อ, รายละเอียด, เลขล็อค, โซน, เปิด/ปิดรับออเดอร์)
 func (s *Server) UpdateMyVendor(w http.ResponseWriter, r *http.Request) {
 	claims, _ := middleware.ClaimsFromContext(r.Context())
 
@@ -94,17 +98,19 @@ func (s *Server) UpdateMyVendor(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, vendor)
 }
 
-// ListVendors is public: customers browse stalls without logging in.
+// ListVendors เป็น public endpoint: ลูกค้าดูรายชื่อร้านค้าได้โดยไม่ต้อง login
 func (s *Server) ListVendors(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, s.Store.ListVendors())
 }
 
+// vendorDetail รวมข้อมูลร้านค้า + เมนูทั้งหมด ไว้ในก้อนเดียว เพื่อให้หน้าเมนูร้านค้า
+// ของฝั่งลูกค้าเรียก API แค่ครั้งเดียวจบ
 type vendorDetail struct {
 	models.Vendor
 	MenuItems []*models.MenuItem `json:"menu_items"`
 }
 
-// GetVendorDetail is public: a stall's profile plus its menu.
+// GetVendorDetail เป็น public endpoint: ดูโปรไฟล์ร้านค้าพร้อมเมนูทั้งหมดได้โดยไม่ต้อง login
 func (s *Server) GetVendorDetail(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -120,7 +126,7 @@ func (s *Server) GetVendorDetail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// --- Menu items (managed by the owning vendor) ---
+// --- Menu items (จัดการได้เฉพาะร้านค้าเจ้าของเมนูนั้นๆ) ---
 
 type menuItemRequest struct {
 	Name        string `json:"name"`
@@ -129,6 +135,7 @@ type menuItemRequest struct {
 	IsAvailable *bool  `json:"is_available"`
 }
 
+// CreateMenuItem เพิ่มเมนูใหม่ให้ร้านค้าของตัวเอง (เมนูใหม่ตั้งเป็น "มีขาย" โดย default)
 func (s *Server) CreateMenuItem(w http.ResponseWriter, r *http.Request) {
 	vendor, ok := s.myVendorOrError(w, r)
 	if !ok {
@@ -162,6 +169,7 @@ func (s *Server) CreateMenuItem(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusCreated, item)
 }
 
+// ListMyMenuItems คืนเมนูทั้งหมดของร้านตัวเอง (สำหรับหน้าจัดการเมนูของร้านค้า)
 func (s *Server) ListMyMenuItems(w http.ResponseWriter, r *http.Request) {
 	vendor, ok := s.myVendorOrError(w, r)
 	if !ok {
@@ -170,6 +178,7 @@ func (s *Server) ListMyMenuItems(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, s.Store.ListMenuItemsByVendor(vendor.ID))
 }
 
+// UpdateMenuItem แก้ไขเมนู (ต้องเป็นเมนูของร้านตัวเองเท่านั้น ห้ามแก้เมนูร้านอื่น)
 func (s *Server) UpdateMenuItem(w http.ResponseWriter, r *http.Request) {
 	vendor, ok := s.myVendorOrError(w, r)
 	if !ok {
@@ -205,6 +214,7 @@ func (s *Server) UpdateMenuItem(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, item)
 }
 
+// DeleteMenuItem ลบเมนู (ต้องเป็นเมนูของร้านตัวเองเท่านั้น)
 func (s *Server) DeleteMenuItem(w http.ResponseWriter, r *http.Request) {
 	vendor, ok := s.myVendorOrError(w, r)
 	if !ok {
@@ -224,8 +234,8 @@ func (s *Server) DeleteMenuItem(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// myVendorOrError resolves the authenticated user's stall, writing a 404
-// response and returning ok=false if they haven't set one up yet.
+// myVendorOrError หาร้านค้าของผู้ใช้ที่ login อยู่ ถ้ายังไม่เคยตั้งค่าร้านไว้
+// จะเขียน response 404 ให้เลยแล้วคืน ok=false (handler ที่เรียกต้องจบการทำงานทันที)
 func (s *Server) myVendorOrError(w http.ResponseWriter, r *http.Request) (*models.Vendor, bool) {
 	claims, _ := middleware.ClaimsFromContext(r.Context())
 	vendor, err := s.Store.GetVendorByOwnerID(claims.UserID)

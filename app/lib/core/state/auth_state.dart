@@ -6,11 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api_client.dart';
 import '../models/user.dart';
 
+/// เก็บสถานะการ login ไว้ทั้งแอป (ผ่าน provider) และจำ session ไว้ใน
+/// shared_preferences เพื่อให้เปิดแอปใหม่แล้วไม่ต้อง login ซ้ำ
 class AuthState extends ChangeNotifier {
   final ApiClient apiClient;
 
   AppUser? _user;
-  bool _loading = true;
+  bool _loading = true; // true ระหว่างที่กำลังโหลด session เก่าจาก storage ตอนเปิดแอป
 
   AuthState(this.apiClient) {
     _restore();
@@ -20,6 +22,8 @@ class AuthState extends ChangeNotifier {
   bool get isLoading => _loading;
   bool get isLoggedIn => _user != null;
 
+  /// ตอนเปิดแอป เช็คว่ามี token/user ที่เคย login ไว้ค้างอยู่ใน storage ไหม
+  /// ถ้ามีก็เอามาใช้ต่อเลยโดยไม่ต้อง login ใหม่
   Future<void> _restore() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -29,6 +33,7 @@ class AuthState extends ChangeNotifier {
         _user = AppUser.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
         apiClient.token = token;
       } catch (_) {
+        // ข้อมูลที่ cache ไว้เสียหายหรือรูปแบบเปลี่ยนไป ให้ logout แทนที่จะ crash
         await logout();
       }
     }
@@ -58,6 +63,8 @@ class AuthState extends ChangeNotifier {
     await _onAuthenticated(result);
   }
 
+  /// เก็บ token + user ไว้ทั้งใน memory (ให้ ApiClient ใช้เรียก API ต่อ) และ
+  /// ใน shared_preferences (ให้จำ session ข้ามการเปิดแอปใหม่ได้)
   Future<void> _onAuthenticated(AuthResult result) async {
     apiClient.token = result.token;
     _user = result.user;

@@ -7,6 +7,8 @@ import '../../core/state/auth_state.dart';
 import 'order_history_screen.dart';
 import 'vendor_menu_screen.dart';
 
+/// หน้าแรกของลูกค้า: รายชื่อร้านค้าทั้งหมดในตลาดนัด (public endpoint ไม่ต้อง
+/// login ก็ดูได้ แต่หน้านี้จะเห็นได้ก็ต่อเมื่อ login เป็นลูกค้าแล้ว ดู AuthGate)
 class VendorListScreen extends StatefulWidget {
   const VendorListScreen({super.key});
 

@@ -19,11 +19,15 @@ type registerRequest struct {
 	Role     string `json:"role"`
 }
 
+// authResponse คือรูปแบบ response ที่ทั้ง Register และ Login คืนกลับ: token
+// สำหรับใช้เรียก API อื่นๆ ต่อ พร้อมข้อมูลผู้ใช้
 type authResponse struct {
 	Token string      `json:"token"`
 	User  models.User `json:"user"`
 }
 
+// Register สมัครสมาชิกใหม่ (role ต้องเป็น "customer" หรือ "vendor" เท่านั้น)
+// แล้วออก JWT ให้เลยทันที (ไม่ต้อง login ซ้ำหลังสมัคร)
 func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := httpjson.Decode(r, &req); err != nil {
@@ -73,6 +77,7 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+// Login ตรวจสอบอีเมล/รหัสผ่าน แล้วออก JWT ใหม่ให้ถ้าถูกต้อง
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := httpjson.Decode(r, &req); err != nil {
@@ -83,6 +88,8 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	user, err := s.Store.GetUserByEmail(email)
 	if err != nil || !authutil.VerifyPassword(user.PasswordHash, req.Password) {
+		// จงใจตอบข้อความเดียวกันไม่ว่าจะเป็นเพราะ "ไม่มีอีเมลนี้" หรือ "รหัสผ่านผิด"
+		// เพื่อไม่ให้คนร้ายรู้ว่าอีเมลไหนมีอยู่ในระบบจริง
 		httpjson.Error(w, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
@@ -90,6 +97,8 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	s.respondWithToken(w, user)
 }
 
+// respondWithToken ออก JWT ให้ user แล้วส่ง response กลับในรูปแบบเดียวกันทั้ง
+// Register และ Login
 func (s *Server) respondWithToken(w http.ResponseWriter, user *models.User) {
 	token, err := authutil.GenerateToken(user.ID, string(user.Role), s.Config.JWTSecret, s.Config.TokenTTL)
 	if err != nil {

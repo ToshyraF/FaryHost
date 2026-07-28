@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import '../../core/api_exception.dart';
 import '../../core/state/auth_state.dart';
 
+/// หน้าจอสมัครสมาชิก — เลือกได้ว่าจะสมัครเป็น "ลูกค้า" หรือ "ร้านค้า"
+/// (role นี้กำหนดตายตัวตอนสมัคร เปลี่ยนทีหลังไม่ได้ ตรงกับ backend ที่ไม่มี
+/// endpoint แก้ role)
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -30,6 +33,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  /// สมัครสมาชิกแล้ว login ให้อัตโนมัติในคราวเดียว (AuthState.register จะเก็บ
+  /// token ที่ backend ออกให้ตอนสมัครเสร็จ ไม่ต้อง login ซ้ำ)
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -68,6 +73,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // ปุ่มเลือกบทบาท: ลูกค้า หรือ ร้านค้า
                   SegmentedButton<String>(
                     segments: const [
                       ButtonSegment(value: 'customer', label: Text('ลูกค้า')),
@@ -100,6 +106,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _passwordController,
                     decoration: const InputDecoration(labelText: 'รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)'),
                     obscureText: true,
+                    // ต้องตรงกับกฎของ backend (registerRequest ใน auth.go: len(password) >= 8)
                     validator: (v) => (v == null || v.length < 8) ? 'รหัสผ่านอย่างน้อย 8 ตัวอักษร' : null,
                   ),
                   if (_error != null) ...[

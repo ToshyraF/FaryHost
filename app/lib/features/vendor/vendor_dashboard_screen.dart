@@ -8,6 +8,8 @@ import '../../core/state/auth_state.dart';
 import 'menu_management_tab.dart';
 import 'vendor_orders_tab.dart';
 
+/// หน้าหลักของฝั่งร้านค้า — เช็คก่อนว่าเคยตั้งค่าร้านไว้หรือยัง
+/// (getMyVendor() == null) ถ้ายัง จะโชว์ฟอร์มตั้งค่าร้านแทน dashboard
 class VendorDashboardScreen extends StatefulWidget {
   const VendorDashboardScreen({super.key});
 
@@ -45,12 +47,16 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
   }
 }
 
+/// dashboard ของร้านค้าที่ตั้งค่าเสร็จแล้ว มี 2 แท็บ: คำสั่งซื้อ กับ เมนู
+/// (เป็น widget ธรรมดาฝังใน TabBarView ไม่ใช่คนละหน้าจอแยก)
 class _VendorHome extends StatelessWidget {
   final Vendor vendor;
   final VoidCallback onVendorUpdated;
 
   const _VendorHome({required this.vendor, required this.onVendorUpdated});
 
+  /// เปิด/ปิดรับออเดอร์ — ต้องส่งข้อมูลเดิมของร้าน (ชื่อ/รายละเอียด/ล็อค/โซน)
+  /// กลับไปด้วยเสมอ เพราะ backend เขียนทับทุก field ที่ส่งมาใน PATCH ตัวนี้
   Future<void> _toggleOpen(BuildContext context, bool value) async {
     await context.read<ApiClient>().updateMyVendor(
           name: vendor.name,
@@ -103,6 +109,7 @@ class _VendorHome extends StatelessWidget {
   }
 }
 
+/// ฟอร์มตั้งค่าร้านค้าครั้งแรก (แสดงเฉพาะตอนที่ vendor user ยังไม่เคยสร้างร้านเลย)
 class _CreateStallScreen extends StatefulWidget {
   final VoidCallback onCreated;
 

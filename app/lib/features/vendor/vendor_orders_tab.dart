@@ -7,6 +7,9 @@ import '../../core/api_client.dart';
 import '../../core/format.dart';
 import '../../core/models/order.dart';
 
+/// แท็บคำสั่งซื้อของร้านค้า: โชว์ออเดอร์ที่เข้ามา พร้อมปุ่มเปลี่ยนสถานะ
+/// (รับออเดอร์ / กำลังทำ / พร้อมรับ / เสร็จสิ้น / ยกเลิก) ตามกติกาใน
+/// OrderStatus.nextStatuses
 class VendorOrdersTab extends StatefulWidget {
   final String vendorId;
 
@@ -24,6 +27,8 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
   void initState() {
     super.initState();
     _load();
+    // ดึงออเดอร์ใหม่ทุก 8 วินาที เพื่อให้ร้านค้าเห็นออเดอร์เข้าใหม่โดยไม่ต้อง
+    // pull-to-refresh เองตลอดเวลา (ไม่ใช้ websocket เพื่อความง่าย)
     _poll = Timer.periodic(const Duration(seconds: 8), (_) => _load());
   }
 
@@ -38,7 +43,7 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
       final orders = await context.read<ApiClient>().listVendorOrders();
       if (mounted) setState(() => _orders = orders);
     } catch (_) {
-      // Keep showing the last known list; the next tick will retry.
+      // เน็ตหลุดชั่วคราวก็ไม่เป็นไร โชว์รายการล่าสุดที่มีไปก่อน รอบถัดไปจะลองใหม่เอง
     }
   }
 
@@ -53,7 +58,7 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
     if (orders == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    // Active orders need attention first; completed/cancelled sink to the bottom.
+    // ออเดอร์ที่ยังต้องจัดการ (ยังไม่จบ) ควรอยู่บนสุด ส่วนที่จบแล้วไหลลงล่าง
     final active = orders.where((o) => o.status != OrderStatus.completed && o.status != OrderStatus.cancelled);
     final done = orders.where((o) => o.status == OrderStatus.completed || o.status == OrderStatus.cancelled);
     final sorted = [...active, ...done];
@@ -68,6 +73,8 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
         itemCount: sorted.length,
         itemBuilder: (context, index) {
           final order = sorted[index];
+          // ตัวเลือกสถานะถัดไปที่กดได้ ดึงมาจากกติกาเดียวกับ backend
+          // (models.NextStatuses ฝั่ง Go / OrderStatus.nextStatuses ฝั่งนี้)
           final nextOptions = OrderStatus.nextStatuses[order.status] ?? const <String>[];
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -93,6 +100,7 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
                     Wrap(
                       spacing: 8,
                       children: [
+                        // ปุ่ม "ยกเลิก" ใช้สไตล์ outline แยกจากปุ่มเดินหน้าสถานะปกติ
                         for (final next in nextOptions)
                           if (next == OrderStatus.cancelled)
                             OutlinedButton(

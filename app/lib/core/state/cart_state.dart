@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/menu_item.dart';
 
+/// รายการสินค้า 1 บรรทัดในตะกร้า (เมนู + จำนวนที่สั่ง)
 class CartLine {
   final MenuItem menuItem;
   final int quantity;
@@ -11,9 +12,9 @@ class CartLine {
   int get subtotalCents => menuItem.priceCents * quantity;
 }
 
-/// An order is always placed with a single stall, so the cart only ever
-/// holds lines from one vendor at a time. Adding an item from a different
-/// vendor clears whatever was there before.
+/// ตะกร้าสินค้า — เนื่องจาก 1 ออเดอร์สั่งได้แค่ร้านเดียว ตะกร้านี้จึงเก็บสินค้า
+/// จากร้านเดียวได้ทีละร้านเท่านั้น ถ้าเพิ่มสินค้าจากร้านอื่นเข้ามา จะล้าง
+/// ตะกร้าเดิมทิ้งก่อนอัตโนมัติ
 class CartState extends ChangeNotifier {
   String? _vendorId;
   final Map<String, CartLine> _lines = {};
@@ -25,8 +26,10 @@ class CartState extends ChangeNotifier {
   int get totalCents => _lines.values.fold(0, (sum, l) => sum + l.subtotalCents);
   int get itemCount => _lines.values.fold(0, (sum, l) => sum + l.quantity);
 
+  /// true ถ้าตะกร้อนี้มีของจากร้านอื่น (ไม่ใช่ vendorId ที่ระบุ) ค้างอยู่
   bool belongsToOtherVendor(String vendorId) => _vendorId != null && _vendorId != vendorId;
 
+  /// เพิ่มสินค้าเข้าตะกร้า ถ้าตะกร้อเดิมเป็นของร้านอื่น จะล้างของเก่าทิ้งก่อน
   void addItem(String vendorId, MenuItem item) {
     if (belongsToOtherVendor(vendorId)) {
       clear();
@@ -37,6 +40,7 @@ class CartState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// ปรับจำนวนสินค้าในตะกร้า ถ้าลดจนเหลือ 0 หรือติดลบ จะเอาออกจากตะกร้าไปเลย
   void setQuantity(String menuItemId, int quantity) {
     final existing = _lines[menuItemId];
     if (existing == null) return;
@@ -56,6 +60,7 @@ class CartState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// แปลงตะกร้าเป็นรูปแบบที่ POST /api/orders ต้องการ (menu_item_id + quantity)
   List<Map<String, dynamic>> toOrderItems() {
     return _lines.values
         .map((l) => {'menu_item_id': l.menuItem.id, 'quantity': l.quantity})

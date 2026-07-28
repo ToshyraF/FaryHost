@@ -1,9 +1,10 @@
+/// เมนูอาหาร 1 รายการของร้านค้าหนึ่งร้าน
 class MenuItem {
   final String id;
   final String vendorId;
   final String name;
   final String? description;
-  final int priceCents;
+  final int priceCents; // ราคาเป็นหน่วยสตางค์ (จำนวนเต็ม) ให้ตรงกับฝั่ง backend
   final bool isAvailable;
   final DateTime createdAt;
 

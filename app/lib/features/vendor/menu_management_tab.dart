@@ -6,6 +6,7 @@ import '../../core/api_exception.dart';
 import '../../core/format.dart';
 import '../../core/models/menu_item.dart';
 
+/// แท็บจัดการเมนูของร้านค้า: เพิ่ม/แก้ไข/ลบ/เปิดปิดขายแต่ละเมนู
 class MenuManagementTab extends StatefulWidget {
   const MenuManagementTab({super.key});
 
@@ -26,6 +27,7 @@ class _MenuManagementTabState extends State<MenuManagementTab> {
     _itemsFuture = context.read<ApiClient>().listMyMenuItems();
   }
 
+  /// เปิด bottom sheet สำหรับเพิ่มเมนูใหม่ (item == null) หรือแก้ไขเมนูเดิม
   Future<void> _openEditor({MenuItem? item}) async {
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -82,6 +84,7 @@ class _MenuManagementTabState extends State<MenuManagementTab> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // สลับ "มีขาย/หมดชั่วคราว" ได้ทันทีโดยไม่ต้องเปิดฟอร์มแก้ไข
                     Switch(value: item.isAvailable, onChanged: (v) => _toggleAvailable(item, v)),
                     IconButton(
                       icon: const Icon(Icons.delete_outline),
@@ -98,6 +101,7 @@ class _MenuManagementTabState extends State<MenuManagementTab> {
   }
 }
 
+/// ฟอร์มเพิ่ม/แก้ไขเมนู 1 รายการ (เปิดเป็น bottom sheet จาก MenuManagementTab)
 class _MenuItemEditor extends StatefulWidget {
   final MenuItem? item;
 
@@ -119,6 +123,7 @@ class _MenuItemEditorState extends State<_MenuItemEditor> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.item?.name ?? '');
+    // ราคาเก็บเป็นสตางค์ (int) ใน backend แต่โชว์/รับค่าเป็นหน่วยบาท (มีทศนิยม) ในฟอร์ม
     _priceController = TextEditingController(
       text: widget.item != null ? (widget.item!.priceCents / 100).toStringAsFixed(2) : '',
     );
@@ -139,6 +144,7 @@ class _MenuItemEditorState extends State<_MenuItemEditor> {
       _submitting = true;
       _error = null;
     });
+    // แปลงราคาจากบาท (เช่น "40.00") กลับเป็นสตางค์ (4000) ก่อนส่งให้ backend
     final priceCents = ((double.tryParse(_priceController.text) ?? 0) * 100).round();
     try {
       final api = context.read<ApiClient>();
@@ -169,6 +175,7 @@ class _MenuItemEditorState extends State<_MenuItemEditor> {
   @override
   Widget build(BuildContext context) {
     return Padding(
+      // เว้นระยะด้านล่างตามความสูงของคีย์บอร์ด กันฟอร์มโดนคีย์บอร์ดบัง
       padding: EdgeInsets.only(
         left: 24,
         right: 24,

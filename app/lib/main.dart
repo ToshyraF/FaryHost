@@ -20,6 +20,9 @@ class FaryHostApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // MultiProvider ทำให้ทุกหน้าจอในแอปเข้าถึง ApiClient, AuthState, CartState
+    // ได้ผ่าน context.read<T>()/context.watch<T>() โดยไม่ต้องส่งผ่าน constructor
+    // ทีละชั้น (dependency injection แบบง่ายๆ)
     return MultiProvider(
       providers: [
         Provider<ApiClient>.value(value: apiClient),
@@ -35,8 +38,9 @@ class FaryHostApp extends StatelessWidget {
   }
 }
 
-/// Routes to the login flow, the customer home, or the vendor home based on
-/// the signed-in user's role.
+/// ตัวตัดสินใจ routing แบบ role-based ตัวเดียวของแอป: ยังไม่ login ไปหน้า
+/// login, login แล้วเป็น vendor ไปหน้า dashboard ร้านค้า, login แล้วเป็น
+/// customer ไปหน้ารายชื่อร้านค้า
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 

@@ -6,6 +6,7 @@ import '../../core/format.dart';
 import '../../core/models/order.dart';
 import 'order_status_screen.dart';
 
+/// ประวัติการสั่งอาหารทั้งหมดของลูกค้าที่ login อยู่
 class OrderHistoryScreen extends StatefulWidget {
   const OrderHistoryScreen({super.key});
 

@@ -1,9 +1,8 @@
-// Package store holds application state in memory behind a small
-// repository-style API. See backend/README.md for why: this sandbox's
-// network policy blocks the Go module proxy, so a real driver
-// (pgx/lib/pq) can't be fetched here. Every method signature below is
-// written so a Postgres-backed implementation can be swapped in later
-// without touching handlers.
+// Package store เก็บข้อมูลทั้งหมดไว้ในหน่วยความจำ (in-memory) ผ่าน API
+// รูปแบบ repository เล็กๆ ดู backend/README.md ว่าทำไม: sandbox นี้ network
+// policy บล็อก Go module proxy เลยดึง driver จริง (pgx/lib/pq) มาใช้ไม่ได้
+// method ทุกตัวด้านล่างถูกออกแบบ signature ไว้ให้ implementation ที่ต่อกับ
+// Postgres จริงมาแทนได้ทีหลัง โดยไม่ต้องแก้โค้ดฝั่ง handlers เลย
 package store
 
 import (
@@ -18,23 +17,27 @@ import (
 
 var (
 	ErrNotFound = errors.New("not found")
-	ErrConflict = errors.New("conflict")
+	ErrConflict = errors.New("conflict") // เช่น อีเมลซ้ำ หรือร้านค้าที่มีอยู่แล้ว
 )
 
+// Store คือฐานข้อมูลจำลองในหน่วยความจำ ข้อมูลจะหายทั้งหมดเมื่อ process รีสตาร์ท
+// ใช้ sync.RWMutex (mu) ล็อกป้องกัน race condition เวลามีหลาย request เข้ามาพร้อมกัน
 type Store struct {
 	mu sync.RWMutex
 
 	usersByID    map[string]*models.User
-	usersByEmail map[string]string // email -> user ID
+	usersByEmail map[string]string // email -> user ID (ใช้หา user ตอน login)
 
 	vendorsByID     map[string]*models.Vendor
-	vendorByOwnerID map[string]string // owner user ID -> vendor ID
+	vendorByOwnerID map[string]string // owner user ID -> vendor ID (เช็คว่า 1 คนเปิดร้านได้แค่ 1 ร้าน)
 
 	menuItemsByID map[string]*models.MenuItem
 
 	ordersByID map[string]*models.Order
 }
 
+// New สร้าง Store เปล่าๆ พร้อมใช้งาน (ต้องเรียกก่อนใช้งานเสมอ ห้ามใช้ Store{} ตรงๆ
+// เพราะ map ข้างในยังไม่ได้ถูก make)
 func New() *Store {
 	return &Store{
 		usersByID:       make(map[string]*models.User),
@@ -48,6 +51,7 @@ func New() *Store {
 
 // --- Users ---
 
+// CreateUser สร้างผู้ใช้ใหม่ คืน ErrConflict ถ้าอีเมลนี้มีคนใช้แล้ว
 func (s *Store) CreateUser(u *models.User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -86,6 +90,8 @@ func (s *Store) GetUserByID(id string) (*models.User, error) {
 
 // --- Vendors ---
 
+// CreateVendor สร้างร้านค้าใหม่ คืน ErrConflict ถ้า user คนนี้เปิดร้านไปแล้ว
+// (กติกา: 1 vendor user เปิดร้านได้แค่ 1 ร้านเท่านั้น)
 func (s *Store) CreateVendor(v *models.Vendor) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -111,6 +117,7 @@ func (s *Store) GetVendorByID(id string) (*models.Vendor, error) {
 	return v, nil
 }
 
+// GetVendorByOwnerID ใช้หาร้านค้าของ vendor user ที่ login อยู่ (endpoint /vendors/me)
 func (s *Store) GetVendorByOwnerID(ownerUserID string) (*models.Vendor, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -122,6 +129,7 @@ func (s *Store) GetVendorByOwnerID(ownerUserID string) (*models.Vendor, error) {
 	return s.vendorsByID[id], nil
 }
 
+// ListVendors คืนร้านค้าทั้งหมด เรียงตามวันที่สร้างก่อนหลัง (ร้านเก่าสุดขึ้นก่อน)
 func (s *Store) ListVendors() []*models.Vendor {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -168,6 +176,8 @@ func (s *Store) GetMenuItem(id string) (*models.MenuItem, error) {
 	return item, nil
 }
 
+// ListMenuItemsByVendor คืนเมนูทั้งหมดของร้านค้าหนึ่งร้าน (รวมเมนูที่หมด/ปิดขายด้วย
+// เพราะ handler ฝั่งร้านค้าต้องเห็นครบเพื่อจัดการเมนู ส่วนฝั่งลูกค้าจะกรองเองที่ UI)
 func (s *Store) ListMenuItemsByVendor(vendorID string) []*models.MenuItem {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -206,6 +216,7 @@ func (s *Store) DeleteMenuItem(id string) error {
 
 // --- Orders ---
 
+// CreateOrder บันทึกออเดอร์ใหม่ พร้อมสุ่มรหัสรับอาหาร (Code) ให้อัตโนมัติ
 func (s *Store) CreateOrder(o *models.Order) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -230,19 +241,22 @@ func (s *Store) GetOrder(id string) (*models.Order, error) {
 	return o, nil
 }
 
+// ListOrdersByCustomer คืนประวัติการสั่งของลูกค้าคนหนึ่ง (ใหม่สุดขึ้นก่อน)
 func (s *Store) ListOrdersByCustomer(customerID string) []*models.Order {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.filterOrdersLocked(func(o *models.Order) bool { return o.CustomerID == customerID })
 }
 
+// ListOrdersByVendor คืนออเดอร์ที่เข้ามาที่ร้านค้าหนึ่งร้าน (ใหม่สุดขึ้นก่อน)
 func (s *Store) ListOrdersByVendor(vendorID string) []*models.Order {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.filterOrdersLocked(func(o *models.Order) bool { return o.VendorID == vendorID })
 }
 
-// filterOrdersLocked assumes the caller already holds s.mu (read or write).
+// filterOrdersLocked จะถูกเรียกตอนที่ mu ถูกล็อกไว้แล้วเท่านั้น (จะ read lock หรือ
+// write lock ก็ได้ ฟังก์ชันนี้แค่วนอ่าน ไม่ได้แก้ไขอะไร)
 func (s *Store) filterOrdersLocked(match func(*models.Order) bool) []*models.Order {
 	out := make([]*models.Order, 0)
 	for _, o := range s.ordersByID {
@@ -254,6 +268,8 @@ func (s *Store) filterOrdersLocked(match func(*models.Order) bool) []*models.Ord
 	return out
 }
 
+// UpdateOrderStatus เปลี่ยนสถานะออเดอร์และอัปเดตเวลาแก้ไขล่าสุด
+// (การเช็คว่าเปลี่ยนสถานะข้ามขั้นได้หรือไม่ ทำที่ชั้น handlers ไม่ใช่ที่นี่)
 func (s *Store) UpdateOrderStatus(id string, status models.OrderStatus) (*models.Order, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

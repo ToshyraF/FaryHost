@@ -7,6 +7,8 @@ import '../../core/format.dart';
 import '../../core/state/cart_state.dart';
 import 'order_status_screen.dart';
 
+/// หน้าตะกร้า/เช็คเอาต์ — ยืนยันสั่งอาหารแล้วยิง POST /api/orders
+/// จ่ายเงินสดหน้าร้านเท่านั้น ไม่มีการชำระเงินผ่านแอป (MVP นี้ยังไม่รองรับ)
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
@@ -35,6 +37,7 @@ class _CartScreenState extends State<CartScreen> {
           );
       cart.clear();
       if (!mounted) return;
+      // แทนที่หน้าตะกร้าด้วยหน้าสถานะออเดอร์ (ไม่ push ซ้อน กันกดย้อนกลับมาสั่งซ้ำ)
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => OrderStatusScreen(orderId: order.id)),
       );
@@ -68,6 +71,7 @@ class _CartScreenState extends State<CartScreen> {
                   ListTile(
                     title: Text(line.menuItem.name),
                     subtitle: Text(formatBaht(line.menuItem.priceCents)),
+                    // ปุ่ม +/- ปรับจำนวน กดลบจนเหลือ 0 จะเอาออกจากตะกร้าเอง (ดู CartState.setQuantity)
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

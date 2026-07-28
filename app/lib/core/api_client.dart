@@ -7,15 +7,15 @@ import 'models/order.dart';
 import 'models/user.dart';
 import 'models/vendor.dart';
 
-/// Talks to the Go backend in backend/. Matches the routes documented in
-/// backend/README.md.
+/// คุยกับ Go backend ใน backend/ ที่เดียว ทุกหน้าจอต้องเรียกผ่านคลาสนี้เท่านั้น
+/// (ห้ามเรียก http package ตรงๆ จากหน้าจอ) เพื่อให้จุดคุยกับ API รวมอยู่ที่เดียว
 ///
-/// Default assumes the backend runs on localhost:8080. On the Android
-/// emulator, localhost refers to the emulator itself, not the host machine
-/// — pass baseUrl: 'http://10.0.2.2:8080/api' there instead.
+/// ค่า default คือ backend รันที่ localhost:8080 — บน Android emulator
+/// คำว่า localhost หมายถึงตัว emulator เอง ไม่ใช่เครื่องจริงที่รัน emulator
+/// ให้ส่ง baseUrl: 'http://10.0.2.2:8080/api' แทนตอน new ApiClient()
 class ApiClient {
   final String baseUrl;
-  String? token;
+  String? token; // JWT ที่ได้จาก login/register เก็บไว้แนบไปกับทุก request ที่ต้อง auth
 
   ApiClient({this.baseUrl = 'http://localhost:8080/api'});
 
@@ -26,6 +26,8 @@ class ApiClient {
     return headers;
   }
 
+  /// แปลง response จาก backend เป็น JSON ถ้า status ไม่ใช่ 2xx จะโยน
+  /// ApiException พร้อมข้อความ error ที่ backend ส่งมาให้
   Future<dynamic> _decode(http.Response res) async {
     final body = res.body.isEmpty ? null : jsonDecode(res.body);
     if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -80,7 +82,7 @@ class ApiClient {
     return AuthResult.fromJson(json);
   }
 
-  // --- Vendors (public) ---
+  // --- ร้านค้า (public: ดูได้โดยไม่ต้อง login) ---
 
   Future<List<Vendor>> listVendors() async {
     final json = await _get('/vendors') as List<dynamic>;
@@ -92,7 +94,7 @@ class ApiClient {
     return VendorDetail.fromJson(json);
   }
 
-  // --- Vendor's own stall ---
+  // --- ร้านค้าของตัวเอง (ต้อง login เป็น vendor) ---
 
   Future<Vendor> createVendor({
     required String name,
@@ -109,6 +111,8 @@ class ApiClient {
     return Vendor.fromJson(json);
   }
 
+  /// คืน null ถ้า vendor user คนนี้ยังไม่เคยตั้งค่าร้านค้าไว้ (แทนที่จะโยน error)
+  /// เพื่อให้ VendorDashboardScreen เอาไปเช็คแล้วโชว์ฟอร์มตั้งค่าร้านแทนได้ง่ายๆ
   Future<Vendor?> getMyVendor() async {
     try {
       final json = await _get('/vendors/me') as Map<String, dynamic>;
@@ -136,7 +140,7 @@ class ApiClient {
     return Vendor.fromJson(json);
   }
 
-  // --- Vendor's own menu ---
+  // --- เมนูของร้านตัวเอง ---
 
   Future<List<MenuItem>> listMyMenuItems() async {
     final json = await _get('/vendors/me/menu-items') as List<dynamic>;
@@ -174,7 +178,7 @@ class ApiClient {
 
   Future<void> deleteMenuItem(String id) => _delete('/vendors/me/menu-items/$id');
 
-  // --- Orders ---
+  // --- ออเดอร์ ---
 
   Future<Order> createOrder({
     required String vendorId,
@@ -210,6 +214,7 @@ class ApiClient {
   }
 }
 
+/// ผลลัพธ์จากการ login/register: token ไว้เรียก API อื่นต่อ + ข้อมูลผู้ใช้
 class AuthResult {
   final String token;
   final AppUser user;

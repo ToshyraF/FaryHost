@@ -13,8 +13,9 @@ type contextKey string
 
 const claimsContextKey contextKey = "claims"
 
-// RequireAuth verifies the Bearer token and attaches its claims to the
-// request context. Handlers read them back with ClaimsFromContext.
+// RequireAuth คือ middleware ที่ตรวจสอบ Bearer token ใน header Authorization
+// ถ้าถูกต้อง จะแนบ claims (user ID + role) ไปกับ request context เพื่อให้
+// handler ตัวถัดไปเรียก ClaimsFromContext มาใช้ได้
 func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -37,8 +38,8 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 	}
 }
 
-// RequireRole rejects requests whose authenticated user isn't one of the
-// given roles. Must be mounted after RequireAuth.
+// RequireRole ปฏิเสธ request ที่ผู้ใช้ที่ login อยู่ไม่ใช่ role ที่กำหนด
+// ต้องนำไปต่อ "หลัง" RequireAuth เสมอ (ต้องมี claims อยู่ใน context ก่อนแล้ว)
 func RequireRole(role string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +53,7 @@ func RequireRole(role string) func(http.Handler) http.Handler {
 	}
 }
 
+// ClaimsFromContext ดึง claims ที่ RequireAuth แนบไว้ใน context กลับมาใช้ใน handler
 func ClaimsFromContext(ctx context.Context) (*authutil.Claims, bool) {
 	claims, ok := ctx.Value(claimsContextKey).(*authutil.Claims)
 	return claims, ok

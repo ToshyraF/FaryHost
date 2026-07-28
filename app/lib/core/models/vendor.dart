@@ -1,13 +1,14 @@
 import 'menu_item.dart';
 
+/// ร้านค้า/แผงขายของในตลาดนัด 1 ร้าน
 class Vendor {
   final String id;
   final String ownerUserId;
   final String name;
   final String? description;
-  final String? stallNumber;
-  final String? marketZone;
-  final bool isOpen;
+  final String? stallNumber; // เลขล็อค/แผง
+  final String? marketZone; // โซนในตลาด
+  final bool isOpen; // ถ้าปิด ลูกค้าจะสั่งอาหารจากร้านนี้ไม่ได้
   final DateTime createdAt;
 
   Vendor({
@@ -35,6 +36,8 @@ class Vendor {
   }
 }
 
+/// ข้อมูลร้านค้าแบบละเอียด (ร้านค้า + เมนูทั้งหมด) ที่ได้จาก endpoint
+/// GET /api/vendors/{id} — ใช้ตอนลูกค้าเปิดดูหน้าเมนูของร้าน
 class VendorDetail extends Vendor {
   final List<MenuItem> menuItems;
 
