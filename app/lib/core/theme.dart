@@ -5,5 +5,5 @@ import 'package:flutter/material.dart';
 /// เพื่อไม่ให้สอง MaterialApp คนละที่ตั้งค่า fontFamily ไม่ตรงกันโดยไม่ได้ตั้งใจ
 /// (ถ้าไม่ตรงกัน ภาพ golden ที่ render จะไม่ใช้ font 'Loma' ที่โหลดไว้)
 ThemeData buildAppTheme() {
-  return ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true, fontFamily: 'Loma');
+  return ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true, fontFamily: 'Loma');
 }
