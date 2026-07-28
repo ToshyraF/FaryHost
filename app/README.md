@@ -69,6 +69,19 @@ them — after that, plain `flutter test` will catch any unintended visual
 regression. Golden images are OS/Flutter-version sensitive; regenerate them
 if you change Flutter version or run CI on a different OS than local dev.
 
+**Don't have Flutter locally either?** `.github/workflows/ci.yml`'s `flutter`
+job runs `flutter test` on every push/PR. Since no golden PNGs are committed
+yet, that step is *expected to fail* the first time — but `flutter_test`
+automatically renders the actual output of every failing/missing golden
+comparison into a `failures/` folder next to the test, and the workflow
+uploads that folder as the `golden-test-failures` artifact regardless of
+pass/fail. Download it from the workflow run's Summary page, eyeball the
+rendered screenshots, and if they look right, either copy them into
+`test/golden/*/goldens/` yourself or run `flutter test --update-goldens`
+locally once you have Flutter — then commit. Don't treat this failure as a
+bug to silence (e.g. by making the step `continue-on-error`); a real
+regression later needs this check to still be able to go red.
+
 ## Status
 
 Written and reviewed for consistency against the backend's request/response

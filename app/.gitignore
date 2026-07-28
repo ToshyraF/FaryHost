@@ -11,3 +11,7 @@ web/
 linux/
 macos/
 windows/
+
+# ภาพที่ flutter_test render ตอน golden test ไม่ตรง/ยังไม่มีไฟล์อ้างอิง
+# (ดู .github/workflows/ci.yml) เป็นผลลัพธ์ของการรันเทส ไม่ใช่ source ที่ควร commit
+test/**/failures/

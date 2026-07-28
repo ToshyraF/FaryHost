@@ -71,6 +71,19 @@ If you're working in an environment where these constraints don't apply
 the above is a localized change — nothing outside the affected package/file
 needs to know.
 
+## CI (`.github/workflows/ci.yml`)
+
+Two jobs, both running on GitHub's hosted runners (which have neither
+constraint above): `backend` runs `go build`/`go vet`/`gofmt -l`/`go test`;
+`flutter` runs `flutter pub get`/`flutter analyze` (non-blocking)/`flutter
+test`. Until the golden tests' reference PNGs are committed (see
+`app/README.md`), the `flutter test` step is *expected* to fail — the
+workflow uploads whatever `flutter_test` renders for the failing/missing
+comparisons as the `golden-test-failures` artifact so a human can review
+and promote them to `app/test/golden/*/goldens/`. Don't "fix" that failure
+by adding `continue-on-error`; it's supposed to stay a real check once
+goldens exist.
+
 ## Backend architecture (`backend/`)
 
 Layered, single binary, no framework:
