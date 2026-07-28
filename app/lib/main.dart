@@ -6,7 +6,7 @@ import 'core/state/auth_state.dart';
 import 'core/state/cart_state.dart';
 import 'core/theme.dart';
 import 'features/auth/welcome_screen.dart';
-import 'features/customer/vendor_list_screen.dart';
+import 'features/customer/market_map_screen.dart';
 import 'features/vendor/vendor_dashboard_screen.dart';
 
 void main() {
@@ -41,7 +41,8 @@ class FaryHostApp extends StatelessWidget {
 
 /// ตัวตัดสินใจ routing แบบ role-based ตัวเดียวของแอป: ยังไม่ login ไปหน้า
 /// ต้อนรับ (เลือกเข้าสู่ระบบ/สมัครสมาชิกจากตรงนั้น), login แล้วเป็น vendor
-/// ไปหน้า dashboard ร้านค้า, login แล้วเป็น customer ไปหน้ารายชื่อร้านค้า
+/// ไปหน้า dashboard ร้านค้า, login แล้วเป็น customer ไปหน้า "เดินเล่นในตลาด"
+/// (มีปุ่มสลับไปดูแบบรายการธรรมดาได้จากหน้านั้น)
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -58,6 +59,6 @@ class AuthGate extends StatelessWidget {
     if (auth.user!.isVendor) {
       return const VendorDashboardScreen();
     }
-    return const VendorListScreen();
+    return const MarketMapScreen();
   }
 }

@@ -40,8 +40,29 @@ script has not actually been run — see "Status" below.
 - `lib/core/api_client.dart` — the only place that talks HTTP; every screen goes through it. Takes an optional `client: http.Client` so tests can swap in `package:http/testing.dart`'s `MockClient` instead of hitting the network.
 - `lib/core/state` — `AuthState` (session + token persistence via `shared_preferences`) and `CartState` (single-vendor cart, since an order belongs to one stall) as `ChangeNotifier`s via `provider`.
 - `lib/features/auth` — welcome (shown first, before login) / login / register.
-- `lib/features/customer` — stall list, stall menu + add to cart, cart/checkout (payment is mandatory — `CreateOrder` always comes back `awaiting_payment`), order status (shows a PromptPay QR while `awaiting_payment`, switches to the pickup code once paid; polls every 5s, which doubles as the payment-status check), order history.
+- `lib/features/customer` — market map (customer home, see below) / stall list (alternate view), stall menu + add to cart, cart/checkout (payment is mandatory — `CreateOrder` always comes back `awaiting_payment`), order status (shows a PromptPay QR while `awaiting_payment`, switches to the pickup code once paid; polls every 5s, which doubles as the payment-status check), order history.
 - `lib/features/vendor` — stall setup, orders tab (accept/prepare/ready/complete, polls every 8s), menu management tab.
+
+## Market map
+
+`MarketMapScreen` is the customer home (`AuthGate` routes here, not straight
+to the plain list — that's still reachable via the app bar's "ดูแบบรายการ"
+button). Stalls are laid out in a fixed grid derived from their index in the
+vendor list (deterministic, not random, so the map looks the same on every
+load); tapping empty ground walks an avatar there via `AnimatedPositioned`,
+tapping a stall walks the avatar to it and opens that stall's menu, and a
+stall's marker scales up slightly and its border highlights when the avatar
+is within `_nearRadius` — a game-ish touch with no functional gate behind it
+(every stall stays tappable regardless of avatar position, since this is a
+real ordering app first).
+
+The map floor and everything on it is built from plain widgets — a
+`CustomPainter` for the ground, `Icon`/`Container`/`DecoratedBox` for the
+avatar and stall markers — rather than an illustrated background or a game
+engine like [Flame](https://flame-engine.org). Two reasons: this sandbox
+has no network access to fetch any image assets, and adding an untested new
+package here (on top of everything else that's never been run — see
+"Status") wasn't worth the risk for what a `CustomPainter` can already do.
 
 ## Payment
 
@@ -72,9 +93,9 @@ golden screenshot would show blank boxes instead of the actual Thai text.
 
 `test/golden/` has widget-level golden (screenshot) tests for the screens
 that render meaningfully without a live backend: welcome, login, register,
-cart (empty + with items), the vendor list, order status (both the
-awaiting-payment QR view and the post-payment pickup-code view), and the
-vendor create-stall form. Screens that need data mock the network via
+cart (empty + with items), the market map, the vendor list, order status
+(both the awaiting-payment QR view and the post-payment pickup-code view),
+and the vendor create-stall form. Screens that need data mock the network via
 `package:http/testing.dart`'s `MockClient` (see
 `vendor_list_screen_test.dart`, `order_status_screen_test.dart`,
 `vendor_create_stall_screen_test.dart` for the pattern) — `test_helpers.dart`'s
