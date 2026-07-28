@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/api_client.dart';
 import '../../core/models/vendor.dart';
 import '../../core/state/auth_state.dart';
+import 'market_game/market_map_game_screen.dart';
 import 'order_history_screen.dart';
 import 'vendor_list_screen.dart';
 import 'vendor_menu_screen.dart';
@@ -79,6 +80,13 @@ class _MarketMapScreenState extends State<MarketMapScreen> {
       appBar: AppBar(
         title: const Text('เดินเล่นในตลาด'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.videogame_asset),
+            tooltip: 'ทดลองเวอร์ชันเกม (Flame)',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MarketMapGameScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.view_list),
             tooltip: 'ดูแบบรายการ',

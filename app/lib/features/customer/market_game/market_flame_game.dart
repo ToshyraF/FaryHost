@@ -1,0 +1,156 @@
+import 'dart:ui';
+
+import 'package:flame/components.dart';
+import 'package:flame/effects.dart';
+import 'package:flame/events.dart';
+import 'package:flame/game.dart';
+import 'package:flutter/material.dart' show Colors, Curves, TextStyle;
+
+import '../../../core/models/vendor.dart';
+
+const _columns = 2;
+const _cellHeight = 180.0;
+const _stallSize = 72.0;
+const _playerSize = 44.0;
+const _topPadding = 60.0;
+const _bottomPadding = 80.0;
+
+/// เวอร์ชันทดลองของแผนที่ตลาด สร้างด้วย Flame (Flutter game engine) แทนการ
+/// วาดด้วย widget ล้วนๆ เหมือน MarketMapScreen ปกติ — โครงเดียวกัน (ตัวละคร
+/// เดินไปตามที่แตะ, แตะร้านค้าให้เดินไปหาแล้วเปิดเมนู) แต่ render ผ่าน
+/// game loop ของ Flame แทน widget tree ธรรมดา
+///
+/// นี่คือของทดลองจริงๆ: ไม่เคย build/รันเลยเพราะ sandbox นี้ไม่มี network
+/// ให้ดึง flame จาก pub.dev มาใช้ได้ (เหมือนที่ MarketMapScreen ตัวปกติเลี่ยง
+/// การพึ่ง external package มาโดยตลอด) ต้องรอ CI (ที่เข้าถึง pub.dev ได้จริง)
+/// ยืนยันว่า compile ผ่านและ API ที่ใช้ตรงกับเวอร์ชัน flame ที่ resolve ได้จริง
+class MarketFlameGame extends FlameGame with TapCallbacks {
+  final List<Vendor> vendors;
+  final void Function(Vendor vendor) onOpenVendor;
+
+  MarketFlameGame({required this.vendors, required this.onOpenVendor});
+
+  late final PlayerComponent player;
+
+  @override
+  Color backgroundColor() => const Color(0xFFF3E5C8);
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+
+    final mapHeight = _mapHeight(vendors.length);
+    final cellWidth = size.x / _columns;
+
+    // ทางเดินสีเข้มขึ้นสลับกับพื้นตลาด (สีพื้นมาจาก backgroundColor() ด้านบน)
+    for (double y = _topPadding + _cellHeight / 2 - 14; y < mapHeight; y += _cellHeight) {
+      add(
+        RectangleComponent(
+          position: Vector2(0, y),
+          size: Vector2(size.x, 28),
+          paint: Paint()..color = const Color(0xFFE3D2A6),
+        ),
+      );
+    }
+
+    for (var i = 0; i < vendors.length; i++) {
+      final vendor = vendors[i];
+      final position = _stallPosition(i, cellWidth);
+      add(
+        StallComponent(
+          vendor: vendor,
+          stallPosition: position,
+          onTap: () {
+            player.walkTo(position);
+            onOpenVendor(vendor);
+          },
+        ),
+      );
+    }
+
+    player = PlayerComponent()..position = Vector2(size.x / 2, _topPadding);
+    add(player);
+  }
+
+  @override
+  void onTapUp(TapUpEvent event) {
+    player.walkTo(event.localPosition);
+  }
+
+  Vector2 _stallPosition(int index, double cellWidth) {
+    final row = index ~/ _columns;
+    final col = index % _columns;
+    return Vector2(
+      col * cellWidth + cellWidth / 2,
+      row * _cellHeight + _cellHeight / 2 + _topPadding,
+    );
+  }
+
+  double _mapHeight(int vendorCount) {
+    final rows = (vendorCount / _columns).ceil();
+    return rows * _cellHeight + _topPadding + _bottomPadding;
+  }
+}
+
+/// ตัวละครของผู้เล่น — วงกลมสีพร้อม effect เดินแบบ animate ไปยังจุดที่แตะ
+class PlayerComponent extends PositionComponent {
+  PlayerComponent() : super(size: Vector2.all(_playerSize), anchor: Anchor.center);
+
+  @override
+  Future<void> onLoad() async {
+    add(
+      CircleComponent(
+        radius: _playerSize / 2,
+        paint: Paint()..color = const Color(0xFF1565C0),
+      ),
+    );
+  }
+
+  void walkTo(Vector2 target) {
+    add(MoveToEffect(target, EffectController(duration: 0.35, curve: Curves.easeOut)));
+  }
+}
+
+/// ป้ายร้านค้า 1 ร้านบนแผนที่ Flame — แตะที่วงกลมนี้เพื่อเดินไปหาแล้วเปิดเมนู
+class StallComponent extends PositionComponent with TapCallbacks {
+  final Vendor vendor;
+  final void Function() onTap;
+
+  StallComponent({
+    required this.vendor,
+    required Vector2 stallPosition,
+    required this.onTap,
+  }) : super(position: stallPosition, size: Vector2.all(_stallSize), anchor: Anchor.center);
+
+  @override
+  Future<void> onLoad() async {
+    add(
+      CircleComponent(
+        radius: _stallSize / 2,
+        paint: Paint()..color = vendor.isOpen ? Colors.white : Colors.grey.shade300,
+      ),
+    );
+    add(
+      CircleComponent(
+        radius: _stallSize / 2,
+        paint: Paint()
+          ..color = Colors.brown.shade300
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      ),
+    );
+    add(
+      TextComponent(
+        text: vendor.name,
+        anchor: Anchor.topCenter,
+        position: Vector2(_stallSize / 2, _stallSize + 4),
+        textRenderer: TextPaint(style: const TextStyle(fontSize: 12, color: Colors.black)),
+      ),
+    );
+  }
+
+  @override
+  void onTapUp(TapUpEvent event) {
+    onTap();
+  }
+}

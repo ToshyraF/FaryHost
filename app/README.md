@@ -59,10 +59,29 @@ real ordering app first).
 The map floor and everything on it is built from plain widgets — a
 `CustomPainter` for the ground, `Icon`/`Container`/`DecoratedBox` for the
 avatar and stall markers — rather than an illustrated background or a game
-engine like [Flame](https://flame-engine.org). Two reasons: this sandbox
-has no network access to fetch any image assets, and adding an untested new
-package here (on top of everything else that's never been run — see
-"Status") wasn't worth the risk for what a `CustomPainter` can already do.
+engine. Two reasons: this sandbox has no network access to fetch any image
+assets, and adding an untested new package (on top of everything else
+that's never been run — see "Status") wasn't worth the risk for what a
+`CustomPainter` can already do for the default experience.
+
+### Experimental: Flame version
+
+`lib/features/customer/market_game/` is the same map re-implemented on top
+of [Flame](https://flame-engine.org) (`MarketFlameGame` + `FlameGame`
+components for the ground, player, and stalls), reachable from
+`MarketMapScreen`'s app bar ("ทดลองเวอร์ชันเกม") rather than replacing the
+default screen. This is a genuine, first-time experiment: `flame` is the
+first external package added to this app since the widget-only approach
+above was chosen specifically to avoid this risk, and — like everything
+else here — it has never been built, since this sandbox has no network
+access to `pub.dev` to fetch it or a Flutter SDK to compile it. Expect it
+to need a round or two of CI-driven fixes (see `.github/workflows/ci.yml`)
+before it actually renders correctly; that's the plan, not a sign
+something's wrong. It deliberately doesn't replace `MarketMapScreen` so the
+app keeps a working customer experience regardless of how that shakes out.
+Known simplification: no camera/scrolling, so stalls past what fits in the
+viewport aren't reachable in this experimental screen (the widget-based
+`MarketMapScreen` scrolls fine).
 
 ## Payment
 
@@ -93,13 +112,18 @@ golden screenshot would show blank boxes instead of the actual Thai text.
 
 `test/golden/` has widget-level golden (screenshot) tests for the screens
 that render meaningfully without a live backend: welcome, login, register,
-cart (empty + with items), the market map, the vendor list, order status
-(both the awaiting-payment QR view and the post-payment pickup-code view),
-and the vendor create-stall form. Screens that need data mock the network via
+cart (empty + with items), the market map (both the widget version and the
+experimental Flame version), the vendor list, order status (both the
+awaiting-payment QR view and the post-payment pickup-code view), and the
+vendor create-stall form. Screens that need data mock the network via
 `package:http/testing.dart`'s `MockClient` (see
 `vendor_list_screen_test.dart`, `order_status_screen_test.dart`,
 `vendor_create_stall_screen_test.dart` for the pattern) — `test_helpers.dart`'s
-`pumpGolden` wires up the same providers `main.dart` does.
+`pumpGolden` wires up the same providers `main.dart` does. Pass
+`settle: false` for a screen with a continuously-running game loop (see
+`market_map_game_screen_test.dart`) — `pumpAndSettle()` waits for frames to
+stop being scheduled, which never happens for a live Flame game, so the
+test would hang; pump a fixed number of frames manually instead.
 
 ```
 flutter test                      # run all tests, compares against test/golden/*/goldens/*.png

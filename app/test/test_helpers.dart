@@ -14,12 +14,20 @@ import 'package:faryhost_app/core/theme.dart';
 ///
 /// [apiClient] ปกติควรส่ง ApiClient ที่ผูกกับ MockClient (package:http/testing.dart)
 /// เพื่อไม่ให้เทสยิง network จริง — ดูตัวอย่างใน vendor_list_screen_test.dart
+///
+/// [settle] ตั้งเป็น false สำหรับหน้าจอที่มี game loop ทำงานตลอดเวลา (เช่น
+/// Flame's GameWidget ใน market_map_game_screen_test.dart) เพราะ
+/// pumpAndSettle() จะรอ "จนกว่าจะไม่มี frame ใหม่ถูก schedule" ซึ่งไม่มีวัน
+/// เกิดขึ้นกับ game loop ที่ render ต่อเนื่องไปเรื่อยๆ — เทสจะค้าง/timeout
+/// ถ้าเรียก pumpAndSettle() ใส่หน้าจอแบบนี้ ผู้เรียกต้อง tester.pump() เอง
+/// เป็นจำนวนรอบที่กำหนดแทน
 Future<void> pumpGolden(
   WidgetTester tester,
   Widget child, {
   ApiClient? apiClient,
   CartState? cartState,
   Size surfaceSize = const Size(400, 800),
+  bool settle = true,
 }) async {
   // AuthState._restore() อ่าน SharedPreferences ตอนสร้าง ต้อง mock ค่าเริ่มต้น
   // ไว้ก่อน ไม่งั้นจะ throw เพราะไม่มี plugin จริงใน widget test
@@ -43,5 +51,7 @@ Future<void> pumpGolden(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  }
 }
