@@ -43,6 +43,19 @@ script has not actually been run — see "Status" below.
 - `lib/features/customer` — stall list, stall menu + add to cart, cart/checkout, order status (polls every 5s while open), order history.
 - `lib/features/vendor` — stall setup, orders tab (accept/prepare/ready/complete, polls every 8s), menu management tab.
 
+## Font
+
+Almost all UI text is Thai, so the app bundles `Loma` (`assets/fonts/`, from
+the fonts-tlwg project — see `assets/fonts/LICENSE-Loma.txt`) and sets it as
+the app-wide default via `lib/core/theme.dart`'s `buildAppTheme()`, rather
+than relying on whatever Thai fallback font each platform happens to ship.
+`test/flutter_test_config.dart` loads the same font before any test runs,
+and `test_helpers.dart`'s `pumpGolden` uses the same `buildAppTheme()` as
+`main.dart` (a shared function, not two copies, so they can't drift apart)
+— both matter because the `flutter_tester` test environment has no real
+fonts at all unless the app explicitly loads one, so without this every
+golden screenshot would show blank boxes instead of the actual Thai text.
+
 ## Golden tests
 
 `test/golden/` has widget-level golden (screenshot) tests for the screens

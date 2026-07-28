@@ -20,3 +20,14 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Bundled so Thai text renders consistently across platforms and, more
+  # importantly here, in golden tests (the flutter_tester test environment
+  # has no real fonts unless the app explicitly ships one — see
+  # test/flutter_test_config.dart). Loma is from the fonts-tlwg project;
+  # see assets/fonts/LICENSE-Loma.txt.
+  fonts:
+    - family: Loma
+      fonts:
+        - asset: assets/fonts/Loma.otf
+        - asset: assets/fonts/Loma-Bold.otf
+          weight: 700

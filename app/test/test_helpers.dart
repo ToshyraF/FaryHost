@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:faryhost_app/core/api_client.dart';
 import 'package:faryhost_app/core/state/auth_state.dart';
 import 'package:faryhost_app/core/state/cart_state.dart';
+import 'package:faryhost_app/core/theme.dart';
 
 /// ห่อ widget ที่จะเทสด้วย MultiProvider + MaterialApp แบบเดียวกับที่ main.dart
 /// ทำจริง เพื่อให้ widget ที่เรียก context.read<ApiClient/AuthState/CartState>()
@@ -37,7 +38,7 @@ Future<void> pumpGolden(
         ChangeNotifierProvider(create: (_) => cartState ?? CartState()),
       ],
       child: MaterialApp(
-        theme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true),
+        theme: buildAppTheme(),
         home: child,
       ),
     ),

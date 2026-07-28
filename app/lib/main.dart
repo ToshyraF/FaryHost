@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'core/api_client.dart';
 import 'core/state/auth_state.dart';
 import 'core/state/cart_state.dart';
+import 'core/theme.dart';
 import 'features/auth/login_screen.dart';
 import 'features/customer/vendor_list_screen.dart';
 import 'features/vendor/vendor_dashboard_screen.dart';
@@ -31,7 +32,7 @@ class FaryHostApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'FaryHost',
-        theme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true),
+        theme: buildAppTheme(),
         home: const AuthGate(),
       ),
     );
