@@ -12,15 +12,54 @@ import 'vendor_menu_screen.dart';
 const _columns = 2;
 const _cellHeight = 180.0;
 const _stallSize = 72.0;
-const _avatarWidth = 40.0;
-const _avatarHeight = 56.0;
-// ระยะขอบสำหรับกันตัวละครเดินชนขอบแผนที่ (ดู _moveAvatarTo) — ตัวเลขเดิม
-// ก่อนเปลี่ยนจากอวตารสี่เหลี่ยมจัตุรัสมาเป็นร่างคนยืน ไม่เกี่ยวกับสัดส่วน
-// ร่างกายจริง แค่กันไว้ให้มีระยะขอบเท่าเดิม
+// ระยะขอบสำหรับกันตัวละครเดินชนขอบแผนที่ (ดู _moveAvatarTo) — ไม่เกี่ยวกับ
+// สัดส่วนตัวสไปรต์จริง แค่กันไว้ให้มีระยะขอบพอสมควรจากขอบแผนที่
 const _avatarClampMargin = 44.0;
 const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
+
+// ตัวละครพิกเซลอาร์ตสไตล์เกม RPG แบบ Pokémon (ตามที่ผู้ใช้ส่งภาพตัวอย่างมา)
+// แทนตัวละครทรงชิบิ/kawaii แบบวงกลม+สี่เหลี่ยมมนแบบเดิม — วาดทีละ "พิกเซล"
+// (บล็อกสี่เหลี่ยมเล็กๆ) ตามตาราง _spriteRows ด้านล่าง ไม่ใช้ภาพ/asset จริง
+// เพราะ sandbox นี้ไม่มี network ให้ดาวน์โหลดภาพ (เหมือนเหตุผลเดิมทุกจุดใน
+// ไฟล์นี้) — ออกแบบ/ตรวจสอบภาพก่อนโดยจำลองเป็น HTML canvas แล้วถ่ายภาพดูด้วย
+// headless Chromium ที่ติดตั้งไว้ในเครื่องนี้ ก่อนย้ายมาเขียนเป็น Dart จริง
+const _spritePixel = 3.0;
+const _spriteRows = <String>[
+  '..............',
+  '....rrrrrr....',
+  '...rrrrrrrr...',
+  '..rrrrrrrrrr..',
+  '..kkkkkkkkkk..',
+  '..ffffffffff..',
+  '..ff.ee.ee.ff.',
+  '..ffffffffff..',
+  '..ffffffffff..',
+  '...ffffffff...',
+  '....wwwwww....',
+  '...jjjjjjjj...',
+  '..jjjjjjjjjj..',
+  '..jjjjjjjjjj..',
+  '..jj.jjjj.jj..',
+  '..oo.pppp.oo..',
+  '..oo.pppp.oo..',
+  '....oo..oo....',
+];
+const _spriteColors = <String, Color>{
+  'r': Color(0xFFD64545), // หมวกแดง
+  'k': Color(0xFFA03232), // เงาขอบหมวก
+  'f': Color(0xFFFFD9A8), // ผิวหน้า
+  'e': Color(0xFF2B2118), // ตา
+  'w': Color(0xFFFFFFFF), // ปกเสื้อขาว
+  'j': Color(0xFF3E7BD1), // เสื้อแจ็คเก็ตฟ้า
+  'p': Color(0xFF2B2B45), // กางเกง
+  'o': Color(0xFF1A1A1A), // รองเท้า/เส้นขอบ
+};
+// ขนาดจริงของตัวละครบนจอ คำนวณจากขนาดตาราง (แถว/คอลัมน์) คูณ _spritePixel —
+// เป็น final ไม่ใช่ const เพราะ .length ไม่ใช่ compile-time constant expression
+final _avatarWidth = _spriteRows.first.length * _spritePixel;
+final _avatarHeight = _spriteRows.length * _spritePixel;
 
 /// หน้าแรกของลูกค้าแบบ "เดินเล่นในตลาด" — แตะที่ไหนก็ได้บนพื้นตลาดให้ตัวละคร
 /// เดินไปตรงนั้น หรือแตะที่ร้านค้าตรงๆ ให้เดินไปหาร้านนั้นแล้วเปิดเมนูเลย
@@ -227,224 +266,44 @@ class _MarketGroundPainter extends CustomPainter {
   bool shouldRepaint(covariant _MarketGroundPainter oldDelegate) => false;
 }
 
-/// ตัวละครของผู้เล่น (ลูกค้า) ออกแบบเป็นคนยืน/เดินสไตล์ชิบิ/kawaii เหมาะกับ
-/// กลุ่มวัยรุ่น — หัว + ลำตัว + แขน + ขาสองข้างที่ก้าวไม่เท่ากันให้ดูเหมือน
-/// กำลังเดิน แทนวงกลมหน้าเดียวหรือไอคอนคนเดินแบบเดิม ประกอบจาก widget ล้วนๆ
-/// ไม่ใช้ภาพ/asset — ทุกชิ้นส่วนวางด้วย Positioned ที่ระบุ
-/// left/top/width/height ครบทุกค่า (คำนวณเป็นพิกเซลตรงๆ จากสัดส่วนของ
-/// _avatarWidth/_avatarHeight) ไม่ใช้ Align เพราะรอบก่อนหน้าที่ใช้ Align ทำให้
-/// golden screenshot ออกมาผิดรูป (sandbox นี้ไม่มี Flutter SDK ให้รันเทียบเอง
-/// ได้ ตรวจพบผ่านการดู CI artifact เท่านั้น)
+/// ตัวละครของผู้เล่น (ลูกค้า) วาดเป็นพิกเซลอาร์ตสไตล์เกม RPG แบบ Pokémon
+/// (หมวกแดง หน้า เสื้อแจ็คเก็ตฟ้า กางเกงเข้ม รองเท้าดำ) ตามภาพตัวอย่างที่
+/// ผู้ใช้ส่งมา แทนตัวละครทรงชิบิ/kawaii แบบวงกลม+สี่เหลี่ยมมนรอบก่อนหน้า —
+/// วาดด้วย CustomPaint ทีละบล็อกตามตาราง _spriteRows (ดูด้านบนของไฟล์)
+/// ไม่ใช้ภาพ/asset จริง
 class _Avatar extends StatelessWidget {
   const _Avatar();
-
-  static const _faceColor = Color(0xFF6B4A6B);
-  static const _blushColor = Color(0xFFFF8FB1);
-  static const _skinGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFFFFB6E6), Color(0xFFB6A8FF)],
-  );
-  static const _armColor = Color(0xFFFFB6E6);
-  static const _headSize = 28.0;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: _avatarWidth,
       height: _avatarHeight,
-      child: Stack(
-        children: [
-          // ขาซ้าย (ก้าวหน้า สัมผัสพื้น)
-          Positioned(
-            left: 11,
-            top: 42,
-            width: 8,
-            height: 14,
-            child: DecoratedBox(
-              decoration: BoxDecoration(color: _faceColor, borderRadius: BorderRadius.circular(4)),
-            ),
-          ),
-          // ขาขวา (ก้าวถอยหลัง/ยกขึ้นเล็กน้อย สั้นกว่า)
-          Positioned(
-            left: 21,
-            top: 40,
-            width: 8,
-            height: 12,
-            child: DecoratedBox(
-              decoration: BoxDecoration(color: _faceColor, borderRadius: BorderRadius.circular(4)),
-            ),
-          ),
-          // แขนซ้าย
-          Positioned(
-            left: 2,
-            top: 29,
-            width: 8,
-            height: 14,
-            child: DecoratedBox(
-              decoration: BoxDecoration(color: _armColor, borderRadius: BorderRadius.circular(4)),
-            ),
-          ),
-          // แขนขวา
-          Positioned(
-            left: 30,
-            top: 29,
-            width: 8,
-            height: 14,
-            child: DecoratedBox(
-              decoration: BoxDecoration(color: _armColor, borderRadius: BorderRadius.circular(4)),
-            ),
-          ),
-          // ลำตัว
-          Positioned(
-            left: 9,
-            top: 26,
-            width: 22,
-            height: 18,
-            child: const DecoratedBox(
-              decoration: BoxDecoration(gradient: _skinGradient, borderRadius: BorderRadius.all(Radius.circular(7))),
-            ),
-          ),
-          // หัว (มีหน้าคิ้วตาแก้มปากอยู่ข้างใน)
-          Positioned(
-            left: (_avatarWidth - _headSize) / 2,
-            top: 0,
-            width: _headSize,
-            height: _headSize,
-            child: const _Head(),
-          ),
-        ],
-      ),
+      child: CustomPaint(painter: _PixelSpritePainter()),
     );
   }
 }
 
-/// หัวของตัวละคร: วงกลมไล่สีชมพู-ม่วงพาสเทล + ตากลมโตมีประกาย + แก้มแดง +
-/// ปากยิ้มเล็กๆ — สัดส่วนเดิมจาก _Avatar ตอนยังเป็นแค่หัวลอย เปลี่ยนฐานคำนวณ
-/// จาก _avatarSize (ทั้งตัว) มาเป็น _headSize (แค่หัว) แทน
-class _Head extends StatelessWidget {
-  const _Head();
-
-  static const _eyeSize = _Avatar._headSize * 0.18;
+/// วาดตาราง _spriteRows ทีละ "พิกเซล" เป็นสี่เหลี่ยมทึบขนาด _spritePixel —
+/// เทคนิคเดียวกับ _MarketGroundPainter ด้านบน (Canvas.drawRect ล้วนๆ)
+class _PixelSpritePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var y = 0; y < _spriteRows.length; y++) {
+      final row = _spriteRows[y];
+      for (var x = 0; x < row.length; x++) {
+        final color = _spriteColors[row[x]];
+        if (color == null) continue; // '.' หรืออักขระที่ไม่รู้จัก = โปร่งใส
+        canvas.drawRect(
+          Rect.fromLTWH(x * _spritePixel, y * _spritePixel, _spritePixel, _spritePixel),
+          Paint()..color = color,
+        );
+      }
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: _Avatar._skinGradient,
-        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))],
-      ),
-      child: Stack(
-        children: [
-          // แก้มซ้าย
-          Positioned(
-            left: _Avatar._headSize * 0.172,
-            top: _Avatar._headSize * 0.614,
-            width: _Avatar._headSize * 0.14,
-            height: _Avatar._headSize * 0.09,
-            child: const _Blush(),
-          ),
-          // แก้มขวา
-          Positioned(
-            left: _Avatar._headSize * 0.688,
-            top: _Avatar._headSize * 0.614,
-            width: _Avatar._headSize * 0.14,
-            height: _Avatar._headSize * 0.09,
-            child: const _Blush(),
-          ),
-          // แถวตาทั้งสองข้าง (กว้างรวม = 2 ตา + ช่องว่างตรงกลาง)
-          Positioned(
-            left: _Avatar._headSize * 0.125,
-            top: _Avatar._headSize * 0.3485,
-            width: _Avatar._headSize * 0.5,
-            height: _eyeSize,
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [_Eye(), _Eye()],
-            ),
-          ),
-          // ปาก
-          Positioned(
-            left: _Avatar._headSize * 0.195,
-            top: _Avatar._headSize * 0.705,
-            width: _Avatar._headSize * 0.22,
-            height: _Avatar._headSize * 0.09,
-            child: Container(
-              decoration: BoxDecoration(
-                color: _Avatar._faceColor,
-                borderRadius: BorderRadius.circular(_Avatar._headSize * 0.05),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// ตาข้างหนึ่งของตัวละคร: วงกลมขาว + รูม่านตาสีเข้ม + จุดประกายเล็กๆ
-class _Eye extends StatelessWidget {
-  const _Eye();
-
-  static const _headSize = _Avatar._headSize;
-  static const _pupilSize = _headSize * 0.1;
-  static const _highlightSize = _headSize * 0.04;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: _headSize * 0.18,
-      height: _headSize * 0.18,
-      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
-      child: Stack(
-        children: [
-          Positioned(
-            left: _headSize * 0.04,
-            top: _headSize * 0.04,
-            width: _pupilSize,
-            height: _pupilSize,
-            child: const _Pupil(),
-          ),
-          Positioned(
-            left: _headSize * 0.049,
-            top: _headSize * 0.042,
-            width: _highlightSize,
-            height: _highlightSize,
-            child: const DecoratedBox(
-              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Pupil extends StatelessWidget {
-  const _Pupil();
-
-  @override
-  Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(shape: BoxShape.circle, color: _Avatar._faceColor),
-    );
-  }
-}
-
-/// แก้มแดงข้างหนึ่ง
-class _Blush extends StatelessWidget {
-  const _Blush();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: _Avatar._blushColor.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(_Avatar._headSize * 0.05),
-      ),
-    );
-  }
+  bool shouldRepaint(covariant _PixelSpritePainter oldDelegate) => false;
 }
 
 /// ป้ายร้านค้า 1 ร้านบนแผนที่ — ขยายเล็กน้อย (AnimatedScale) และขอบเปลี่ยนสี

@@ -11,13 +11,48 @@ import '../../../core/models/vendor.dart';
 const _columns = 2;
 const _cellHeight = 180.0;
 const _stallSize = 72.0;
-const _playerWidth = 40.0;
-const _playerHeight = 56.0;
-const _headSize = 28.0;
-const _headOffset = (_playerWidth - _headSize) / 2;
 const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
+
+// ตัวละครพิกเซลอาร์ตสไตล์เกม RPG แบบ Pokémon เดียวกับเวอร์ชัน widget (ดู
+// _Avatar/_PixelSpritePainter ใน market_map_screen.dart) — คัดลอกตาราง/พาเลต
+// สีมาตรงๆ แทนการ import ข้ามไฟล์ เพื่อให้เวอร์ชันทดลองนี้ยังแยกอิสระจาก
+// เวอร์ชัน widget เหมือนเดิม (จะได้ลบทิ้งได้ง่ายถ้าการทดลอง Flame ไม่ไปต่อ)
+const _spritePixel = 3.0;
+const _spriteRows = <String>[
+  '..............',
+  '....rrrrrr....',
+  '...rrrrrrrr...',
+  '..rrrrrrrrrr..',
+  '..kkkkkkkkkk..',
+  '..ffffffffff..',
+  '..ff.ee.ee.ff.',
+  '..ffffffffff..',
+  '..ffffffffff..',
+  '...ffffffff...',
+  '....wwwwww....',
+  '...jjjjjjjj...',
+  '..jjjjjjjjjj..',
+  '..jjjjjjjjjj..',
+  '..jj.jjjj.jj..',
+  '..oo.pppp.oo..',
+  '..oo.pppp.oo..',
+  '....oo..oo....',
+];
+const _spriteColors = <String, Color>{
+  'r': Color(0xFFD64545),
+  'k': Color(0xFFA03232),
+  'f': Color(0xFFFFD9A8),
+  'e': Color(0xFF2B2118),
+  'w': Color(0xFFFFFFFF),
+  'j': Color(0xFF3E7BD1),
+  'p': Color(0xFF2B2B45),
+  'o': Color(0xFF1A1A1A),
+};
+// เป็น final ไม่ใช่ const เพราะ .length ไม่ใช่ compile-time constant expression
+final _playerWidth = _spriteRows.first.length * _spritePixel;
+final _playerHeight = _spriteRows.length * _spritePixel;
 
 /// เวอร์ชันทดลองของแผนที่ตลาด สร้างด้วย Flame (Flutter game engine) แทนการ
 /// วาดด้วย widget ล้วนๆ เหมือน MarketMapScreen ปกติ — โครงเดียวกัน (ตัวละคร
@@ -141,109 +176,31 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   }
 }
 
-/// ตัวละครของผู้เล่น ออกแบบเป็นคนยืน/เดินสไตล์ชิบิ/kawaii เหมือน _Avatar ใน
-/// เวอร์ชัน widget — หัว (มีตากลมมีประกาย แก้มแดง) + ลำตัว + แขน + ขาสองข้าง
-/// ที่ก้าวไม่เท่ากัน แทนวงกลมหน้าเดียวแบบเดิม ประกอบจาก RectangleComponent
-/// (ลำตัว/แขน/ขา) + CircleComponent ซ้อนกันหลายชั้น (หัว/หน้า — แบบเดียวกับที่
-/// StallComponent ใช้อยู่แล้วและ build ผ่านบน CI มาแล้ว) พร้อม effect เดิน
-/// แบบ animate ไปยังจุดที่แตะ ไม่ใช้ gradient/shader เพื่อลดความเสี่ยงจาก API
-/// ที่ไม่เคยยืนยันในเวอร์ชัน Flame ที่ resolve จริง
+/// ตัวละครของผู้เล่น วาดเป็นพิกเซลอาร์ตสไตล์เกม RPG แบบ Pokémon เดียวกับ
+/// เวอร์ชัน widget (ดู _Avatar/_PixelSpritePainter ใน market_map_screen.dart)
+/// แทนตัวละครทรงชิบิ/kawaii แบบวงกลม+สี่เหลี่ยมมนรอบก่อนหน้า — override
+/// render() วาด Canvas.drawRect ทีละบล็อกตามตาราง _spriteRows โดยตรง แทนการ
+/// ซ้อน CircleComponent/RectangleComponent หลายชิ้น ลดความเสี่ยงจาก API ที่
+/// ไม่เคยยืนยันในเวอร์ชัน Flame ที่ resolve จริง (render(Canvas) เป็น core
+/// API ของ Component ที่เสถียรมาก ทุก shape component ที่ใช้อยู่แล้วในไฟล์นี้
+/// ก็ implement มันแบบเดียวกันนี้อยู่แล้วภายใน)
 class PlayerComponent extends PositionComponent {
   PlayerComponent() : super(size: Vector2(_playerWidth, _playerHeight), anchor: Anchor.center);
 
-  static const _bodyColor = Color(0xFFD9B3FF);
-  static const _armColor = Color(0xFFFFB6E6);
-  static const _faceColor = Color(0xFF6B4A6B);
-  static const _blushColor = Color(0xFFFF8FB1);
-
   @override
-  Future<void> onLoad() async {
-    // ขาซ้าย (ก้าวหน้า สัมผัสพื้น)
-    add(
-      RectangleComponent(
-        position: Vector2(11, 42),
-        size: Vector2(8, 14),
-        paint: Paint()..color = _faceColor,
-      ),
-    );
-    // ขาขวา (ก้าวถอยหลัง/ยกขึ้นเล็กน้อย สั้นกว่า)
-    add(
-      RectangleComponent(
-        position: Vector2(21, 40),
-        size: Vector2(8, 12),
-        paint: Paint()..color = _faceColor,
-      ),
-    );
-    // แขนซ้าย/ขวา
-    add(
-      RectangleComponent(
-        position: Vector2(2, 29),
-        size: Vector2(8, 14),
-        paint: Paint()..color = _armColor,
-      ),
-    );
-    add(
-      RectangleComponent(
-        position: Vector2(_playerWidth - 10, 29),
-        size: Vector2(8, 14),
-        paint: Paint()..color = _armColor,
-      ),
-    );
-    // ลำตัว
-    add(
-      RectangleComponent(
-        position: Vector2(9, 26),
-        size: Vector2(22, 18),
-        paint: Paint()..color = _bodyColor,
-      ),
-    );
-    // หัว
-    add(
-      CircleComponent(
-        radius: _headSize / 2,
-        anchor: Anchor.center,
-        position: Vector2(_headOffset + _headSize / 2, _headSize / 2),
-        paint: Paint()..color = _bodyColor,
-      ),
-    );
-
-    for (final dx in [-_headSize * 0.18, _headSize * 0.18]) {
-      addAll(_eyeParts(Vector2(_headOffset + _headSize / 2 + dx, _headSize * 0.42)));
+  void render(Canvas canvas) {
+    super.render(canvas);
+    for (var y = 0; y < _spriteRows.length; y++) {
+      final row = _spriteRows[y];
+      for (var x = 0; x < row.length; x++) {
+        final color = _spriteColors[row[x]];
+        if (color == null) continue; // '.' หรืออักขระที่ไม่รู้จัก = โปร่งใส
+        canvas.drawRect(
+          Rect.fromLTWH(x * _spritePixel, y * _spritePixel, _spritePixel, _spritePixel),
+          Paint()..color = color,
+        );
+      }
     }
-
-    for (final dx in [-_headSize * 0.24, _headSize * 0.24]) {
-      add(
-        CircleComponent(
-          radius: _headSize * 0.09,
-          anchor: Anchor.center,
-          position: Vector2(_headOffset + _headSize / 2 + dx, _headSize * 0.66),
-          paint: Paint()..color = _blushColor.withOpacity(0.7),
-        ),
-      );
-    }
-  }
-
-  List<Component> _eyeParts(Vector2 center) {
-    return [
-      CircleComponent(
-        radius: _headSize * 0.09,
-        anchor: Anchor.center,
-        position: center,
-        paint: Paint()..color = Colors.white,
-      ),
-      CircleComponent(
-        radius: _headSize * 0.05,
-        anchor: Anchor.center,
-        position: center,
-        paint: Paint()..color = _faceColor,
-      ),
-      CircleComponent(
-        radius: _headSize * 0.02,
-        anchor: Anchor.center,
-        position: Vector2(center.x - _headSize * 0.02, center.y - _headSize * 0.02),
-        paint: Paint()..color = Colors.white,
-      ),
-    ];
   }
 
   void walkTo(Vector2 target) {
