@@ -177,12 +177,16 @@ and `test_helpers.dart`'s `pumpGolden` uses the same `buildAppTheme()` as
 — both matter because the `flutter_tester` test environment has no real
 fonts at all unless the app explicitly loads one, so without this every
 golden screenshot would show blank boxes instead of the actual Thai text.
-The same file also loads `MaterialIcons` from the Flutter framework's own
-bundled font (`packages/flutter/fonts/MaterialIcons-Regular.otf`) for the
-same reason — without it, every `Icon()` (e.g. the market map's stall
-markers) renders as an empty tofu box in golden screenshots instead of the
-actual glyph; this went unnoticed for a while since it doesn't throw, it
-just silently renders wrong.
+
+The market map's stall markers (`Icons.storefront`) have the same
+problem — no `MaterialIcons` font loaded means they render as an empty
+tofu box in golden screenshots instead of the actual glyph, caught from a
+user-uploaded screenshot rather than CI (this doesn't throw, it just
+silently renders wrong). A fix was attempted in `flutter_test_config.dart`
+(loading `packages/flutter/fonts/MaterialIcons-Regular.otf` the same way
+as the Thai font) but that asset path doesn't exist in the Flutter SDK
+version CI resolves and hard-crashed every test instead, so it was
+reverted — this is still an open, known issue, not yet fixed.
 
 ## Golden tests
 
