@@ -52,9 +52,13 @@ vendor list (deterministic, not random, so the map looks the same on every
 load); tapping empty ground walks an avatar there via `AnimatedPositioned`,
 tapping a stall walks the avatar to it and opens that stall's menu, and a
 stall's marker scales up slightly and its border highlights when the avatar
-is within `_nearRadius` — a game-ish touch with no functional gate behind it
-(every stall stays tappable regardless of avatar position, since this is a
-real ordering app first).
+is within `_nearRadius`. Walking close enough to a stall (without tapping it
+directly) auto-opens that stall's menu too — `_maybeAutoOpenNearbyVendor`,
+called after every ground tap, edge-triggers on entering `_nearRadius` (once
+per approach, tracked via `_lastNearVendorId`, not every frame the avatar
+stays there) so standing near a stall doesn't repeatedly push the menu
+screen. Every stall still stays tappable regardless of avatar position too
+(no functional gate), since this is a real ordering app first.
 
 The map floor and everything on it is built from plain widgets — a
 `CustomPainter` for the ground, `Icon`/`Container`/`DecoratedBox` for the
@@ -87,6 +91,11 @@ version CI resolves) in `market_flame_game.dart`, so a map taller than the
 viewport (more vendors than fit on screen at once) scrolls as the player
 walks toward the bottom rows instead of clipping — no horizontal follow
 since the grid's fixed column count always fits the screen width exactly.
+Same proximity auto-open as the widget version: each `StallComponent` has a
+`wasNear` flag, checked every `update()` tick against `_nearRadius`, so
+walking close opens that stall's menu once per approach; tapping a stall
+directly sets `wasNear = true` immediately so the walk-in animation landing
+on the stall doesn't also fire the proximity trigger right after.
 
 ## Payment
 

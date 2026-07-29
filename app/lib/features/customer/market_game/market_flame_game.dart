@@ -14,6 +14,7 @@ const _stallSize = 72.0;
 const _playerSize = 44.0;
 const _topPadding = 60.0;
 const _bottomPadding = 80.0;
+const _nearRadius = 70.0;
 
 /// เวอร์ชันทดลองของแผนที่ตลาด สร้างด้วย Flame (Flutter game engine) แทนการ
 /// วาดด้วย widget ล้วนๆ เหมือน MarketMapScreen ปกติ — โครงเดียวกัน (ตัวละคร
@@ -32,6 +33,7 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
 
   late final PlayerComponent player;
   late final double _worldHeight;
+  final List<StallComponent> _stalls = [];
 
   @override
   Color backgroundColor() => const Color(0xFFF3E5C8);
@@ -58,16 +60,21 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
     for (var i = 0; i < vendors.length; i++) {
       final vendor = vendors[i];
       final position = _stallPosition(i, cellWidth);
-      add(
-        StallComponent(
-          vendor: vendor,
-          stallPosition: position,
-          onTap: () {
-            player.walkTo(position);
-            onOpenVendor(vendor);
-          },
-        ),
+      // ประกาศแบบ late แล้วค่อย assign เพื่อให้ callback onTap อ้างอิงตัวเองได้
+      // (ต้อง set wasNear=true ตอนแตะตรงๆ ไม่งั้นพอเดินไปถึง proximity check
+      // ใน update() จะเห็นว่า "เพิ่งเข้าใกล้" แล้วเปิดเมนูซ้ำอีกรอบ)
+      late final StallComponent stall;
+      stall = StallComponent(
+        vendor: vendor,
+        stallPosition: position,
+        onTap: () {
+          player.walkTo(position);
+          stall.wasNear = true;
+          onOpenVendor(vendor);
+        },
       );
+      _stalls.add(stall);
+      add(stall);
     }
 
     player = PlayerComponent()..position = Vector2(size.x / 2, _topPadding);
@@ -92,6 +99,19 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
     } else {
       // แผนที่เตี้ยกว่าจอ (ร้านค้าน้อย) ไม่ต้อง scroll เลย ตรึงกล้องไว้กลางแผนที่
       camera.viewfinder.position.y = _worldHeight / 2;
+    }
+
+    // เดินเข้าใกล้ร้านไหน (ในระยะ _nearRadius) เปิดเมนูร้านนั้นให้เลย — trigger
+    // ตอน "เพิ่งเข้ามาใกล้" ครั้งเดียว (wasNear เดิมเป็น false) ไม่ใช่ทุก frame
+    // ที่ยังอยู่ในระยะ ไม่งั้นจะเปิดหน้าเมนูซ้อนกันรัวๆ ระหว่างที่ยืนอยู่ตรงนั้น
+    for (final stall in _stalls) {
+      final isNear = stall.position.distanceTo(player.position) < _nearRadius;
+      if (isNear && !stall.wasNear) {
+        stall.wasNear = true;
+        onOpenVendor(stall.vendor);
+      } else if (!isNear) {
+        stall.wasNear = false;
+      }
     }
   }
 
@@ -141,6 +161,9 @@ class PlayerComponent extends PositionComponent {
 class StallComponent extends PositionComponent with TapCallbacks {
   final Vendor vendor;
   final void Function() onTap;
+
+  // ใช้ตรวจว่า "เพิ่งเข้ามาใกล้" ร้านนี้หรือยัง (ดู MarketFlameGame.update())
+  bool wasNear = false;
 
   StallComponent({
     required this.vendor,

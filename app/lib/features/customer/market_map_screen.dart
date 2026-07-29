@@ -37,6 +37,11 @@ class _MarketMapScreenState extends State<MarketMapScreen> {
   late Future<List<Vendor>> _vendorsFuture;
   Offset _avatarPosition = Offset.zero;
   bool _avatarPlaced = false;
+  // เก็บ id ร้านที่เพิ่ง auto-open ไปแล้ว กันไม่ให้เปิดซ้ำทุกครั้งที่อยู่ในระยะ
+  // ใกล้ (trigger ตอน "เพิ่งเข้ามาใกล้" ครั้งเดียว ไม่ใช่ตอน "อยู่ใกล้ต่อเนื่อง")
+  // รีเซ็ตเป็น null ตอนเดินออกจากระยะใกล้ ร้านเดิมจะ auto-open ได้อีกถ้าเดิน
+  // เข้าใกล้ใหม่
+  String? _lastNearVendorId;
 
   @override
   void initState() {
@@ -69,9 +74,33 @@ class _MarketMapScreenState extends State<MarketMapScreen> {
 
   void _openVendor(Vendor vendor, Offset stallPos, double mapWidth, double mapHeight) {
     _moveAvatarTo(stallPos, mapWidth, mapHeight);
+    // กัน _maybeAutoOpenNearbyVendor เปิดร้านเดิมซ้ำถ้าแตะพื้นที่ว่างใกล้ๆ
+    // ร้านนี้อีกทีทันทีหลังกลับมาจากหน้าเมนู
+    _lastNearVendorId = vendor.id;
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => VendorMenuScreen(vendorId: vendor.id)),
     );
+  }
+
+  // เรียกหลัง _moveAvatarTo ทุกครั้งที่แตะพื้นที่ว่าง (ไม่ใช่ตอนแตะร้านค้าตรงๆ
+  // ซึ่งเปิดเมนูอยู่แล้วผ่าน _openVendor — ไม่งั้นจะเปิดซ้อนกัน 2 หน้า) ถ้า
+  // เดินเข้าใกล้ร้านไหน (ในระยะ _nearRadius) ให้เปิดเมนูร้านนั้นขึ้นมาเลย
+  void _maybeAutoOpenNearbyVendor(List<Vendor> vendors, double cellWidth) {
+    Vendor? nearVendor;
+    for (var i = 0; i < vendors.length; i++) {
+      if ((_stallPosition(i, cellWidth) - _avatarPosition).distance < _nearRadius) {
+        nearVendor = vendors[i];
+        break;
+      }
+    }
+    if (nearVendor != null && nearVendor.id != _lastNearVendorId) {
+      _lastNearVendorId = nearVendor.id;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => VendorMenuScreen(vendorId: nearVendor!.id)),
+      );
+    } else if (nearVendor == null) {
+      _lastNearVendorId = null;
+    }
   }
 
   @override
@@ -144,7 +173,10 @@ class _MarketMapScreenState extends State<MarketMapScreen> {
                   // อยู่ข้างบนจะกันไม่ให้ tap ทะลุมาถึงชั้นนี้ ไม่ชนกัน)
                   GestureDetector(
                     behavior: HitTestBehavior.translucent,
-                    onTapUp: (details) => _moveAvatarTo(details.localPosition, mapWidth, mapHeight),
+                    onTapUp: (details) {
+                      _moveAvatarTo(details.localPosition, mapWidth, mapHeight);
+                      _maybeAutoOpenNearbyVendor(vendors, cellWidth);
+                    },
                     child: SizedBox(width: mapWidth, height: mapHeight),
                   ),
                   for (var i = 0; i < vendors.length; i++)
