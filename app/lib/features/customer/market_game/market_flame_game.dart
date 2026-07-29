@@ -187,7 +187,9 @@ class PlayerComponent extends PositionComponent {
   Future<void> onLoad() async {
     await super.onLoad();
     final data = await rootBundle.load(assetPath);
-    _sheet = await decodeImageFromList(data.buffer.asUint8List());
+    final codec = await instantiateImageCodec(data.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    _sheet = frame.image;
   }
 
   @override
