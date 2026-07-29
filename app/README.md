@@ -83,11 +83,19 @@ license text and provenance. Each sheet is a 128x128 grid of 4x4 frames
 up/back; columns 0-3 are a 4-frame walk cycle.
 
 `CharacterSprite` (`lib/features/customer/character_sprite.dart`) crops and
-scales one frame from a sheet — `Image.asset` loads the whole sheet,
-`OverflowBox` + `Transform.translate` (an explicit pixel offset, not a
-fractional `Align`, per the lesson from the earlier `Align`-in-`Stack` bug)
-shifts the desired frame into view, and the outer `ClipRect` cuts off the
-rest; `FilterQuality.none` keeps the pixel edges crisp when scaled up.
+scales one frame from a sheet — `Image.asset` loads the whole sheet, a
+`Stack` + `Positioned` with explicit `left`/`top`/`width`/`height` (all four
+values given directly) shifts the desired frame into view, and the outer
+`ClipRect` cuts off the rest; `FilterQuality.none` keeps the pixel edges
+crisp when scaled up. The first version used `OverflowBox` +
+`alignment: Alignment.topLeft` instead of `Positioned`, which rendered the
+avatar completely invisible in a real render (caught from a user-uploaded
+golden screenshot, not CI — `flutter test --update-goldens` only checks
+that *a* frame renders without throwing, not that it looks right) — the
+exact same class of bug as the earlier `Align`-in-`Stack` issue on the
+hand-drawn avatar, both fixed the same way: explicit `Positioned` with all
+four values, never a fractional `Align`/`OverflowBox` alignment for
+sprite/UI-part placement in this codebase.
 `CharacterState` (`lib/core/state/character_state.dart`) persists which of
 the 10 characters the customer picked via `shared_preferences`, the same
 pattern as `AuthState`'s session persistence; `CharacterSelectScreen`
@@ -169,6 +177,12 @@ and `test_helpers.dart`'s `pumpGolden` uses the same `buildAppTheme()` as
 — both matter because the `flutter_tester` test environment has no real
 fonts at all unless the app explicitly loads one, so without this every
 golden screenshot would show blank boxes instead of the actual Thai text.
+The same file also loads `MaterialIcons` from the Flutter framework's own
+bundled font (`packages/flutter/fonts/MaterialIcons-Regular.otf`) for the
+same reason — without it, every `Icon()` (e.g. the market map's stall
+markers) renders as an empty tofu box in golden screenshots instead of the
+actual glyph; this went unnoticed for a while since it doesn't throw, it
+just silently renders wrong.
 
 ## Golden tests
 

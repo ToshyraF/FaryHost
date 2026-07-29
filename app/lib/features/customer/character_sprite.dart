@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-const _frameSize = 32.0;
 const _sheetGrid = 4; // ตาราง 4x4 เฟรม (แถว/คอลัมน์) ในทุก sprite sheet
 
 /// แสดง 1 เฟรมจาก sprite sheet ตาราง 4x4 (32x32 ต่อเฟรม) ขยายให้เป็นสี่เหลี่ยม
 /// ขนาด [displaySize] คมชัดแบบพิกเซลอาร์ต (ไม่ blur ตอนขยาย) — โหลดทั้งภาพผ่าน
-/// Image.asset ปกติแล้วครอปด้วย OverflowBox + Transform.translate (ค่าตำแหน่ง
-/// ระบุตรงๆ ทั้งหมด ไม่พึ่งพา alignment แบบสัดส่วนที่เคยทำให้ระบุตำแหน่งผิดมาก่อน)
+/// Image.asset ปกติแล้วครอปด้วย Stack + Positioned ที่ระบุ left/top/width/
+/// height ตรงๆ ทั้งสี่ค่า (ไม่ใช่ OverflowBox + alignment ซึ่งเป็นกลไกเดียวกับ
+/// Align แบบสัดส่วนที่เคยทำให้ตัวละครหายไปทั้งตัวมาก่อนหน้านี้ในโปรเจกต์นี้)
 class CharacterSprite extends StatelessWidget {
   final String assetPath;
   final int row;
@@ -28,19 +28,22 @@ class CharacterSprite extends StatelessWidget {
       child: SizedBox(
         width: displaySize,
         height: displaySize,
-        child: OverflowBox(
-          maxWidth: sheetSize,
-          maxHeight: sheetSize,
-          alignment: Alignment.topLeft,
-          child: Transform.translate(
-            offset: Offset(-col * displaySize, -row * displaySize),
-            child: Image.asset(
-              assetPath,
+        child: Stack(
+          clipBehavior: Clip.hardEdge,
+          children: [
+            Positioned(
+              left: -col * displaySize,
+              top: -row * displaySize,
               width: sheetSize,
               height: sheetSize,
-              filterQuality: FilterQuality.none,
+              child: Image.asset(
+                assetPath,
+                width: sheetSize,
+                height: sheetSize,
+                filterQuality: FilterQuality.none,
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
