@@ -68,26 +68,45 @@ assets, and adding an untested new package (on top of everything else
 that's never been run — see "Status") wasn't worth the risk for what a
 `CustomPainter` can already do for the default experience.
 
-The avatar (`_Avatar` in `market_map_screen.dart`) is a small pixel-art
-"chibi portrait" — big head, spiky two-tone hair, big eyes with a
-highlight, bold black outline, small collar hint at the bottom — in the
-style of a reference sheet of chibi character portraits the user shared (an
-original design inspired by that style, not a copy of any specific
-character in it). It's drawn entirely by `_PixelSpritePainter`, a
-`CustomPainter` that fills one small `Rect` per character in the
-`_spriteRows` string grid (each row a line of the sprite, each character a
-palette key into `_spriteColors`, `.` meaning transparent) — no image
-assets, same constraint as everywhere else in this app; a hand-authored
-pixel grid sidesteps needing to fetch a real sprite sheet. The grid/palette
-were designed and checked by rendering the same grid as an HTML `<canvas>`
-and screenshotting it with the pre-installed headless Chromium before ever
-touching the Dart code — the same verification technique used to catch and
-fix the previous shape-based avatar's `Align` bug, and used again here to
-fix the first draft's hair spikes floating disconnected from the head
-before landing on the current grid (kept only as `_avatarWidth`/
-`_avatarHeight`, derived from the grid's own dimensions via
-`_spriteRows.first.length`/`_spriteRows.length` rather than hardcoded, so
-the on-screen size can never drift out of sync with the grid).
+The avatar (`_Avatar` in `market_map_screen.dart`) is a full-body pixel-art
+character — curly two-tone hair, blue jacket, grey pants, maroon shoes,
+bold black outline — modeled on a 3x3 reference sprite sheet the user
+shared showing one character across nine poses/directions (an original
+design in that style, not a copy). It walks: tapping the map picks a
+facing direction (down/up/left/right) from the movement vector and plays a
+2-frame leg walk-cycle while moving. It's drawn by `_PixelSpritePainter`, a
+`CustomPainter` that fills one small `Rect` per character in a string grid
+(`.` meaning transparent) — no image assets, same constraint as everywhere
+else in this app. There are three top-half grids (`_spriteTopDown`,
+`_spriteTopUp`, `_spriteTopLeft`) and two leg grids (`_legsIdle`,
+`_legsStride`, appended below whichever top matches the current facing);
+"right" reuses `_spriteTopLeft` horizontally mirrored via
+`Transform(..scale(-1.0, 1.0))` rather than a fourth hand-drawn direction,
+since the sprite is symmetric enough for a flip to read correctly. Facing
+and walk-frame are tracked in `_MarketMapScreenState` (`_facing`,
+`_walkFrame`) and driven by a `Timer.periodic` (120ms frame swap, 350ms
+total) started each time `_moveAvatarTo` sees real movement.
+
+All five grids/the palette were designed and checked by rendering them as
+an HTML `<canvas>` and screenshotting with the pre-installed headless
+Chromium before ever touching the Dart code — the same technique used to
+catch and fix the previous shape-based avatar's `Align` bug. Two issues
+surfaced and were fixed this way: the first walk-cycle leg grid varied the
+gap's horizontal position across rows, which rendered as a jagged
+diagonal artifact rather than a clean stride — fixed by keeping the gap's
+column position constant between the idle/stride grids and instead varying
+leg *length* (one leg's block stops a row or two earlier than the other).
+Separately, hand-transcribing the verified HTML grids into Dart introduced
+a copy-paste error (two of the three top-half arrays briefly kept an old,
+unrelated hairline pattern) — caught before commit with a small Node
+script that regex-extracts the `const` array literals from both the Dart
+source and the HTML prototype and diffs them with `JSON.stringify`
+equality, row by row. Any future hand-transcribed pixel grid in this app
+should be verified the same way rather than trusted by eye.
+`_avatarWidth`/`_avatarHeight` are derived from the grids' own dimensions
+(`_spriteTopDown.first.length`/`(_spriteTopDown.length +
+_legsIdle.length)`) rather than hardcoded, so the on-screen size can never
+drift out of sync with the grid.
 
 ### Experimental: Flame version
 
@@ -117,15 +136,25 @@ Same proximity auto-open as the widget version: each `StallComponent` has a
 walking close opens that stall's menu once per approach; tapping a stall
 directly sets `wasNear = true` immediately so the walk-in animation landing
 on the stall doesn't also fire the proximity trigger right after.
-`PlayerComponent` gets the same pixel-art sprite as the widget version's
-`_Avatar` — the exact same `_spriteRows`/`_spriteColors` grid, copied
-rather than shared via import so this experimental version stays free-
-standing — drawn by overriding `render(Canvas canvas)` directly and calling
-`canvas.drawRect` per pixel, instead of composing `CircleComponent`/
-`RectangleComponent` children like the previous shape-based look did.
-`render(Canvas)` is the same core hook every built-in Flame shape component
-already implements internally, so this is, if anything, less exposed to
-unverified Flame API surface than the child-component approach was.
+`PlayerComponent` gets the same full-body, 4-direction, walk-animated
+sprite as the widget version's `_Avatar` — the exact same grids/palette,
+copied rather than shared via import so this experimental version stays
+free-standing (verified byte-identical to the widget copy with the same
+Node diff script mentioned above) — drawn by overriding
+`render(Canvas canvas)` directly and calling `canvas.drawRect` per pixel,
+instead of composing `CircleComponent`/`RectangleComponent` children like
+the previous shape-based look did. `render(Canvas)` is the same core hook
+every built-in Flame shape component already implements internally, so
+this is, if anything, less exposed to unverified Flame API surface than
+the child-component approach was. `walkTo()` computes a facing direction
+from the target vs. current position delta (mirroring
+`_moveAvatarTo`'s logic in the widget file) and drives the same
+120ms/350ms `Timer.periodic` walk-cycle; the "right" direction is mirrored
+inside `render()` with `canvas.translate(size.x, 0)` + `canvas.scale(-1,
+1)` around the draw calls (Flame's `Canvas` is the same `dart:ui` canvas
+Flutter uses, so this is the same flip technique as the widget version's
+`Transform`, just applied directly to the canvas instead of wrapping a
+widget).
 
 ## Payment
 

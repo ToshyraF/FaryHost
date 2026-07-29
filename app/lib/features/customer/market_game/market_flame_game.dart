@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flame/components.dart';
@@ -15,46 +16,122 @@ const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
 
-// ตัวละครพิกเซลอาร์ต "chibi portrait" เดียวกับเวอร์ชัน widget (ดู
-// _Avatar/_PixelSpritePainter ใน market_map_screen.dart) — คัดลอกตาราง/พาเลต
-// สีมาตรงๆ แทนการ import ข้ามไฟล์ เพื่อให้เวอร์ชันทดลองนี้ยังแยกอิสระจาก
-// เวอร์ชัน widget เหมือนเดิม (จะได้ลบทิ้งได้ง่ายถ้าการทดลอง Flame ไม่ไปต่อ)
+// ตัวละครพิกเซลอาร์ตเต็มตัว 4 ทิศทาง + 2 เฟรมเดิน เดียวกับเวอร์ชัน widget (ดู
+// _spriteTopDown/_spriteTopUp/_spriteTopLeft/_legsIdle/_legsStride ใน
+// market_map_screen.dart) — คัดลอกตาราง/พาเลตสีมาตรงๆ แทนการ import ข้ามไฟล์
+// เพื่อให้เวอร์ชันทดลองนี้ยังแยกอิสระจากเวอร์ชัน widget เหมือนเดิม (จะได้ลบทิ้ง
+// ได้ง่ายถ้าการทดลอง Flame ไม่ไปต่อ)
 const _spritePixel = 3.0;
-const _spriteRows = <String>[
-  '.....O....O...O.....',
-  '....OhO..OhO.OhO....',
-  '..OOOOOOOOOOOOOOOO..',
-  '.OhhhhhhhhhhhhhhhhO.',
-  '.OhhhhLLhhLLhhhhhhO.',
-  '.OhhhhhhhhhhhhhhhhO.',
-  '..OOOOOOOOOOOOOOOO..',
-  '.OhOFFFFFFFFFFFFOhO.',
-  '.OhOFFFEeFFeEFFFOhO.',
-  '.OFFFFFFFFFFFFFFFFO.',
-  '.OFFFFFFFFFFFFFFFFO.',
-  '...OFFFFFmmmmFFFFO..',
-  '....OFFFFFFFFFFO....',
-  '......OOOOOOOO......',
-  '......OCCCCCCO......',
-  '.....OCcCCcCO.......',
-  '....OCCCCCCCCCCO....',
-  '....OCCCC..CCCCO....',
-  '.....O........O.....',
+const _spriteTopDown = <String>[
+  '......OObbOO........',
+  '.....ObbbbbbO.......',
+  '....ObbBBbbBBbO.....',
+  '...ObbbbbbbbbbbO....',
+  '..ObbBBbbbbBBbbbO...',
+  '.ObbbbbbbbbbbbbbbO..',
+  '.ObbbbbbbbbbbbbbbO..',
+  'ObbbbbbbbbbbbbbbbbO.',
+  'ObbbOOOOOOOOOOObbbO.',
+  'ObbOFFFFFFFFFFFObbO.',
+  '.ObOFFFEeFFeEFFObO..',
+  '.ObOFFFFFFFFFFObO...',
+  '..OFFFFFFFFFFFO.....',
+  '...OFFFmmmmFFO......',
+  '....OFFFFFFFO.......',
+  '......OOOOOO........',
+  '.....OJJJJJJO.......',
+  '....OJJjJJjJJO......',
+  '....OJJJJJJJJO......',
+];
+const _spriteTopUp = <String>[
+  '......OObbOO........',
+  '.....ObbbbbbO.......',
+  '....ObbBBbbBBbO.....',
+  '...ObbbbbbbbbbbO....',
+  '..ObbBBbbbbBBbbbO...',
+  '.ObbbbbbbbbbbbbbbO..',
+  '.ObbbbbbbbbbbbbbbO..',
+  'ObbbbbbbbbbbbbbbbbO.',
+  'ObbbbbbBBbbBBbbbbbO.',
+  'ObbbbbbbbbbbbbbbbbO.',
+  '.ObbbbbbbbbbbbbbbO..',
+  '.ObbbbbbbbbbbbbbbO..',
+  '..ObbbbbbbbbbbbbO...',
+  '...ObbbbbbbbbbbO....',
+  '....ObbbbbbbbbO.....',
+  '......OOOOOO........',
+  '.....OJJJJJJO.......',
+  '....OJJjJJjJJO......',
+  '....OJJJJJJJJO......',
+];
+const _spriteTopLeft = <String>[
+  '.....OObbOO.........',
+  '....ObbbbbbO........',
+  '...ObbBBbbBBbO......',
+  '..ObbbbbbbbbbbO.....',
+  '.ObbBBbbbbbbbbO.....',
+  '.ObbbbbbbbbbbbO.....',
+  'ObbbbbbbbbbbbbO.....',
+  'ObbbbbbbbbbbbbO.....',
+  'ObbbOOOOOOObbbO.....',
+  'ObbOFFFFFFFObbO.....',
+  '.ObOFFEeFFFObO......',
+  '.ObOFFFFFFFObO......',
+  '..OFFFFFFFFO........',
+  '...OFFmmFFO.........',
+  '....OFFFFO..........',
+  '......OOOO..........',
+  '.....OJJJJO.........',
+  '....OJJjJJJO........',
+  '....OJJJJJJO........',
+];
+const _legsIdle = <String>[
+  '....OGGGGGGGGO......',
+  '....OGGGGGGGGO......',
+  '.....OGG..GGO.......',
+  '.....OGG..GGO.......',
+  '.....ORR..RRO.......',
+  '......OO..OO........',
+];
+const _legsStride = <String>[
+  '....OGGGGGGGGO......',
+  '.....OGG..GGO.......',
+  '.....OGG..GGO.......',
+  '.....OGG..RRO.......',
+  '.....ORR....O.......',
+  '......OO............',
 ];
 const _spriteColors = <String, Color>{
   'O': Color(0xFF141414),
-  'h': Color(0xFF2E5AA8),
-  'L': Color(0xFF6FA8F5),
-  'F': Color(0xFFFFE0C2),
-  'E': Color(0xFF1B1B1B),
+  'b': Color(0xFF8A6A5C),
+  'B': Color(0xFFB08E7C),
+  'F': Color(0xFFFFDDBB),
+  'E': Color(0xFF241812),
   'e': Color(0xFFFFFFFF),
-  'm': Color(0xFF7A3B2E),
-  'C': Color(0xFFF2A93C),
-  'c': Color(0xFFC97F1E),
+  'm': Color(0xFF8A4A3A),
+  'J': Color(0xFF5C7A9C),
+  'j': Color(0xFF425E7C),
+  'G': Color(0xFF9A9A9A),
+  'R': Color(0xFF5C2020),
 };
+
+enum _Direction { down, up, left, right }
+
+List<String> _spriteTopFor(_Direction direction) {
+  switch (direction) {
+    case _Direction.down:
+      return _spriteTopDown;
+    case _Direction.up:
+      return _spriteTopUp;
+    case _Direction.left:
+    case _Direction.right:
+      return _spriteTopLeft;
+  }
+}
+
 // เป็น final ไม่ใช่ const เพราะ .length ไม่ใช่ compile-time constant expression
-final _playerWidth = _spriteRows.first.length * _spritePixel;
-final _playerHeight = _spriteRows.length * _spritePixel;
+final _playerWidth = _spriteTopDown.first.length * _spritePixel;
+final _playerHeight = (_spriteTopDown.length + _legsIdle.length) * _spritePixel;
 
 /// เวอร์ชันทดลองของแผนที่ตลาด สร้างด้วย Flame (Flutter game engine) แทนการ
 /// วาดด้วย widget ล้วนๆ เหมือน MarketMapScreen ปกติ — โครงเดียวกัน (ตัวละคร
@@ -178,22 +255,34 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   }
 }
 
-/// ตัวละครของผู้เล่น วาดเป็นพิกเซลอาร์ต "chibi portrait" เดียวกับเวอร์ชัน
-/// widget (ดู _Avatar/_PixelSpritePainter ใน market_map_screen.dart) แทน
-/// สไปรต์ RPG แบบเดินเต็มตัวรอบก่อนหน้า — override
-/// render() วาด Canvas.drawRect ทีละบล็อกตามตาราง _spriteRows โดยตรง แทนการ
-/// ซ้อน CircleComponent/RectangleComponent หลายชิ้น ลดความเสี่ยงจาก API ที่
-/// ไม่เคยยืนยันในเวอร์ชัน Flame ที่ resolve จริง (render(Canvas) เป็น core
-/// API ของ Component ที่เสถียรมาก ทุก shape component ที่ใช้อยู่แล้วในไฟล์นี้
-/// ก็ implement มันแบบเดียวกันนี้อยู่แล้วภายใน)
+/// ตัวละครของผู้เล่น วาดเป็นพิกเซลอาร์ตเต็มตัวเดียวกับเวอร์ชัน widget (ดู
+/// _Avatar/_PixelSpritePainter ใน market_map_screen.dart) หันทิศทางตามที่เดิน
+/// (บน/ล่าง/ซ้าย ใช้ตารางของตัวเอง, ขวา mirror จากซ้าย) พร้อมขา 2 เฟรมสลับกัน
+/// ระหว่างเดิน — override render() วาด Canvas.drawRect ทีละบล็อกตามตาราง
+/// โดยตรง แทนการซ้อน CircleComponent/RectangleComponent หลายชิ้น ลดความเสี่ยง
+/// จาก API ที่ไม่เคยยืนยันในเวอร์ชัน Flame ที่ resolve จริง (render(Canvas)
+/// เป็น core API ของ Component ที่เสถียรมาก ทุก shape component ที่ใช้อยู่แล้ว
+/// ในไฟล์นี้ก็ implement มันแบบเดียวกันนี้อยู่แล้วภายใน)
 class PlayerComponent extends PositionComponent {
   PlayerComponent() : super(size: Vector2(_playerWidth, _playerHeight), anchor: Anchor.center);
+
+  _Direction _facing = _Direction.down;
+  int _walkFrame = 0;
+  Timer? _walkTimer;
 
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    for (var y = 0; y < _spriteRows.length; y++) {
-      final row = _spriteRows[y];
+    final legs = _walkFrame == 0 ? _legsIdle : _legsStride;
+    final rows = [..._spriteTopFor(_facing), ...legs];
+    final mirror = _facing == _Direction.right;
+    if (mirror) {
+      canvas.save();
+      canvas.translate(size.x, 0);
+      canvas.scale(-1, 1);
+    }
+    for (var y = 0; y < rows.length; y++) {
+      final row = rows[y];
       for (var x = 0; x < row.length; x++) {
         final color = _spriteColors[row[x]];
         if (color == null) continue; // '.' หรืออักขระที่ไม่รู้จัก = โปร่งใส
@@ -203,10 +292,38 @@ class PlayerComponent extends PositionComponent {
         );
       }
     }
+    if (mirror) {
+      canvas.restore();
+    }
   }
 
   void walkTo(Vector2 target) {
+    final delta = target - position;
+    if (delta.length > 1) {
+      _facing = delta.x.abs() > delta.y.abs()
+          ? (delta.x > 0 ? _Direction.right : _Direction.left)
+          : (delta.y > 0 ? _Direction.down : _Direction.up);
+      _startWalkAnimation();
+    }
     add(MoveToEffect(target, EffectController(duration: 0.35, curve: Curves.easeOut)));
+  }
+
+  void _startWalkAnimation() {
+    _walkTimer?.cancel();
+    _walkFrame = 1;
+    _walkTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
+      _walkFrame = 1 - _walkFrame;
+    });
+    Future.delayed(const Duration(milliseconds: 350), () {
+      _walkTimer?.cancel();
+      _walkFrame = 0;
+    });
+  }
+
+  @override
+  void onRemove() {
+    _walkTimer?.cancel();
+    super.onRemove();
   }
 }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -19,51 +21,132 @@ const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
 
-// ตัวละครพิกเซลอาร์ตสไตล์ "chibi portrait" (หัวโต ผมทรงแหลมสองโทน ตาโตมีประกาย
-// เส้นขอบดำหนา) ตามภาพตัวอย่างชุดตัวละครที่ผู้ใช้ส่งมา แทนสไปรต์ RPG
-// แบบเดินเต็มตัวรอบก่อนหน้า — วาดทีละ "พิกเซล" (บล็อกสี่เหลี่ยมเล็กๆ) ตาม
-// ตาราง _spriteRows ด้านล่าง ไม่ใช้ภาพ/asset จริง เพราะ sandbox นี้ไม่มี
-// network ให้ดาวน์โหลดภาพ (เหมือนเหตุผลเดิมทุกจุดในไฟล์นี้) — ออกแบบตัว
-// ละครต้นแบบเอง (ไม่ได้ก็อปปี้ตัวละครใดตัวหนึ่งจากภาพตัวอย่างตรงๆ) แล้ว
-// ตรวจสอบภาพก่อนโดยจำลองเป็น HTML canvas แล้วถ่ายภาพดูด้วย headless
-// Chromium ที่ติดตั้งไว้ในเครื่องนี้ ก่อนย้ายมาเขียนเป็น Dart จริง
+// ตัวละครพิกเซลอาร์ตเต็มตัว 4 ทิศ (ก้ม/หลัง/ซ้าย + ขวา = mirror ของซ้าย) x
+// 2 เฟรมขา (ยืนนิ่ง/ก้าวเดิน) สำหรับ movement ตามภาพตัวอย่างที่ผู้ใช้ส่งมา
+// (ผมพองสองโทน เสื้อแจ็คเก็ต กางเกงเทา รองเท้าแดงเข้ม) — ออกแบบตัวละครเอง
+// ในสไตล์เดียวกัน ไม่ได้ก็อปปี้ตัวใดตัวหนึ่งจากภาพตรงๆ วาดทีละ "พิกเซล"
+// (บล็อกสี่เหลี่ยมเล็กๆ) เหมือนเดิม ไม่ใช้ภาพ/asset จริง เพราะ sandbox นี้
+// ไม่มี network ให้ดาวน์โหลดภาพ — ออกแบบ/ตรวจสอบภาพก่อนโดยจำลองเป็น HTML
+// canvas แล้วถ่ายภาพดูด้วย headless Chromium ที่ติดตั้งไว้ในเครื่องนี้
+// ก่อนย้ายมาเขียนเป็น Dart จริง (รอบแรกขาตอนก้าวเดินมีรอยหยักแปลกๆ เพราะช่อง
+// ว่างระหว่างขากว้างไม่เท่ากันแต่ละแถว แก้โดยให้ขาซ้าย/ขวาเป็นแท่งตรงยาว
+// ไม่เท่ากันแทน ไม่ใช่ปรับความกว้างช่องว่าง)
 const _spritePixel = 3.0;
-const _spriteRows = <String>[
-  '.....O....O...O.....',
-  '....OhO..OhO.OhO....',
-  '..OOOOOOOOOOOOOOOO..',
-  '.OhhhhhhhhhhhhhhhhO.',
-  '.OhhhhLLhhLLhhhhhhO.',
-  '.OhhhhhhhhhhhhhhhhO.',
-  '..OOOOOOOOOOOOOOOO..',
-  '.OhOFFFFFFFFFFFFOhO.',
-  '.OhOFFFEeFFeEFFFOhO.',
-  '.OFFFFFFFFFFFFFFFFO.',
-  '.OFFFFFFFFFFFFFFFFO.',
-  '...OFFFFFmmmmFFFFO..',
-  '....OFFFFFFFFFFO....',
-  '......OOOOOOOO......',
-  '......OCCCCCCO......',
-  '.....OCcCCcCO.......',
-  '....OCCCCCCCCCCO....',
-  '....OCCCC..CCCCO....',
-  '.....O........O.....',
+
+const _spriteTopDown = <String>[
+  '......OObbOO........',
+  '.....ObbbbbbO.......',
+  '....ObbBBbbBBbO.....',
+  '...ObbbbbbbbbbbO....',
+  '..ObbBBbbbbBBbbbO...',
+  '.ObbbbbbbbbbbbbbbO..',
+  '.ObbbbbbbbbbbbbbbO..',
+  'ObbbbbbbbbbbbbbbbbO.',
+  'ObbbOOOOOOOOOOObbbO.',
+  'ObbOFFFFFFFFFFFObbO.',
+  '.ObOFFFEeFFeEFFObO..',
+  '.ObOFFFFFFFFFFObO...',
+  '..OFFFFFFFFFFFO.....',
+  '...OFFFmmmmFFO......',
+  '....OFFFFFFFO.......',
+  '......OOOOOO........',
+  '.....OJJJJJJO.......',
+  '....OJJjJJjJJO......',
+  '....OJJJJJJJJO......',
+];
+const _spriteTopUp = <String>[
+  '......OObbOO........',
+  '.....ObbbbbbO.......',
+  '....ObbBBbbBBbO.....',
+  '...ObbbbbbbbbbbO....',
+  '..ObbBBbbbbBBbbbO...',
+  '.ObbbbbbbbbbbbbbbO..',
+  '.ObbbbbbbbbbbbbbbO..',
+  'ObbbbbbbbbbbbbbbbbO.',
+  'ObbbbbbBBbbBBbbbbbO.',
+  'ObbbbbbbbbbbbbbbbbO.',
+  '.ObbbbbbbbbbbbbbbO..',
+  '.ObbbbbbbbbbbbbbbO..',
+  '..ObbbbbbbbbbbbbO...',
+  '...ObbbbbbbbbbbO....',
+  '....ObbbbbbbbbO.....',
+  '......OOOOOO........',
+  '.....OJJJJJJO.......',
+  '....OJJjJJjJJO......',
+  '....OJJJJJJJJO......',
+];
+const _spriteTopLeft = <String>[
+  '.....OObbOO.........',
+  '....ObbbbbbO........',
+  '...ObbBBbbBBbO......',
+  '..ObbbbbbbbbbbO.....',
+  '.ObbBBbbbbbbbbO.....',
+  '.ObbbbbbbbbbbbO.....',
+  'ObbbbbbbbbbbbbO.....',
+  'ObbbbbbbbbbbbbO.....',
+  'ObbbOOOOOOObbbO.....',
+  'ObbOFFFFFFFObbO.....',
+  '.ObOFFEeFFFObO......',
+  '.ObOFFFFFFFObO......',
+  '..OFFFFFFFFO........',
+  '...OFFmmFFO.........',
+  '....OFFFFO..........',
+  '......OOOO..........',
+  '.....OJJJJO.........',
+  '....OJJjJJJO........',
+  '....OJJJJJJO........',
+];
+// ขา 2 เฟรม ใช้ร่วมกันทุกทิศ (แค่ต่อท้ายหลัง top ของแต่ละทิศด้านบน) — เฟรม
+// ยืนนิ่งขาชิด กับเฟรมก้าวเดินขาข้างหนึ่งยาว/ต่ำกว่าอีกข้าง (ไม่ใช่ปรับความ
+// กว้างช่องว่างระหว่างขา ดูเหตุผลด้านบน)
+const _legsIdle = <String>[
+  '....OGGGGGGGGO......',
+  '....OGGGGGGGGO......',
+  '.....OGG..GGO.......',
+  '.....OGG..GGO.......',
+  '.....ORR..RRO.......',
+  '......OO..OO........',
+];
+const _legsStride = <String>[
+  '....OGGGGGGGGO......',
+  '.....OGG..GGO.......',
+  '.....OGG..GGO.......',
+  '.....OGG..RRO.......',
+  '.....ORR....O.......',
+  '......OO............',
 ];
 const _spriteColors = <String, Color>{
   'O': Color(0xFF141414), // เส้นขอบดำหนา
-  'h': Color(0xFF2E5AA8), // ผมโทนกลาง
-  'L': Color(0xFF6FA8F5), // ผมไฮไลต์
-  'F': Color(0xFFFFE0C2), // ผิวหน้า
-  'E': Color(0xFF1B1B1B), // ตา
+  'b': Color(0xFF8A6A5C), // ผมโทนกลาง
+  'B': Color(0xFFB08E7C), // ผมไฮไลต์
+  'F': Color(0xFFFFDDBB), // ผิวหน้า
+  'E': Color(0xFF241812), // ตา
   'e': Color(0xFFFFFFFF), // ประกายตา
-  'm': Color(0xFF7A3B2E), // ปาก
-  'C': Color(0xFFF2A93C), // เสื้อคอปก
-  'c': Color(0xFFC97F1E), // เงาเสื้อ
+  'm': Color(0xFF8A4A3A), // ปาก
+  'J': Color(0xFF5C7A9C), // เสื้อแจ็คเก็ต
+  'j': Color(0xFF425E7C), // เงาเสื้อ
+  'G': Color(0xFF9A9A9A), // กางเกง
+  'R': Color(0xFF5C2020), // รองเท้า
 };
 // ขนาดจริงของตัวละครบนจอ คำนวณจากขนาดตาราง (แถว/คอลัมน์) คูณ _spritePixel —
 // เป็น final ไม่ใช่ const เพราะ .length ไม่ใช่ compile-time constant expression
-final _avatarWidth = _spriteRows.first.length * _spritePixel;
-final _avatarHeight = _spriteRows.length * _spritePixel;
+// (ทุกทิศทางสูง/กว้างเท่ากันหมด: top 19 แถว + ขา 6 แถว = 25 แถว, 20 คอลัมน์)
+final _avatarWidth = _spriteTopDown.first.length * _spritePixel;
+final _avatarHeight = (_spriteTopDown.length + _legsIdle.length) * _spritePixel;
+
+enum _Direction { down, up, left, right }
+
+List<String> _spriteTopFor(_Direction direction) {
+  switch (direction) {
+    case _Direction.down:
+      return _spriteTopDown;
+    case _Direction.up:
+      return _spriteTopUp;
+    case _Direction.left:
+    case _Direction.right:
+      return _spriteTopLeft;
+  }
+}
 
 /// หน้าแรกของลูกค้าแบบ "เดินเล่นในตลาด" — แตะที่ไหนก็ได้บนพื้นตลาดให้ตัวละคร
 /// เดินไปตรงนั้น หรือแตะที่ร้านค้าตรงๆ ให้เดินไปหาร้านนั้นแล้วเปิดเมนูเลย
@@ -90,11 +173,23 @@ class _MarketMapScreenState extends State<MarketMapScreen> {
   // รีเซ็ตเป็น null ตอนเดินออกจากระยะใกล้ ร้านเดิมจะ auto-open ได้อีกถ้าเดิน
   // เข้าใกล้ใหม่
   String? _lastNearVendorId;
+  // ทิศที่ตัวละครหันหน้าอยู่ล่าสุด (จากการเดินครั้งก่อน) + เฟรมขา (0=ยืนนิ่ง,
+  // 1=ก้าวเดิน) สลับกันด้วย _walkTimer ระหว่างที่กำลังเคลื่อนที่ ดู
+  // _startWalkAnimation
+  _Direction _facing = _Direction.down;
+  int _walkFrame = 0;
+  Timer? _walkTimer;
 
   @override
   void initState() {
     super.initState();
     _vendorsFuture = context.read<ApiClient>().listVendors();
+  }
+
+  @override
+  void dispose() {
+    _walkTimer?.cancel();
+    super.dispose();
   }
 
   Offset _stallPosition(int index, double cellWidth) {
@@ -112,11 +207,40 @@ class _MarketMapScreenState extends State<MarketMapScreen> {
   }
 
   void _moveAvatarTo(Offset target, double mapWidth, double mapHeight) {
+    final clamped = Offset(
+      target.dx.clamp(_avatarClampMargin, mapWidth - _avatarClampMargin),
+      target.dy.clamp(_avatarClampMargin, mapHeight - _avatarClampMargin),
+    );
+    final delta = clamped - _avatarPosition;
     setState(() {
-      _avatarPosition = Offset(
-        target.dx.clamp(_avatarClampMargin, mapWidth - _avatarClampMargin),
-        target.dy.clamp(_avatarClampMargin, mapHeight - _avatarClampMargin),
-      );
+      // แกนไหนเดินมากกว่า (แนวนอน/แนวตั้ง) ถือว่าตัวละครหันไปทางนั้น — ไม่
+      // เปลี่ยนทิศถ้าแทบไม่ได้ขยับ (เช่นแตะซ้ำตำแหน่งเดิม)
+      if (delta.distance > 1) {
+        _facing = delta.dx.abs() > delta.dy.abs()
+            ? (delta.dx > 0 ? _Direction.right : _Direction.left)
+            : (delta.dy > 0 ? _Direction.down : _Direction.up);
+      }
+      _avatarPosition = clamped;
+    });
+    if (delta.distance > 1) {
+      _startWalkAnimation();
+    }
+  }
+
+  // สลับเฟรมขา (ยืนนิ่ง/ก้าวเดิน) ทุก 120ms ระหว่างที่ตัวละครกำลังเคลื่อนที่
+  // (350ms เท่ากับ duration ของ AnimatedPositioned ที่ใช้เลื่อนตำแหน่งจริง)
+  // แล้วกลับไปยืนนิ่งเมื่อถึงปลายทาง
+  void _startWalkAnimation() {
+    _walkTimer?.cancel();
+    var frame = 1;
+    setState(() => _walkFrame = frame);
+    _walkTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
+      frame = 1 - frame;
+      setState(() => _walkFrame = frame);
+    });
+    Future.delayed(const Duration(milliseconds: 350), () {
+      _walkTimer?.cancel();
+      if (mounted) setState(() => _walkFrame = 0);
     });
   }
 
@@ -239,7 +363,7 @@ class _MarketMapScreenState extends State<MarketMapScreen> {
                     curve: Curves.easeOut,
                     left: _avatarPosition.dx - _avatarWidth / 2,
                     top: _avatarPosition.dy - _avatarHeight / 2,
-                    child: const _Avatar(),
+                    child: _Avatar(facing: _facing, walkFrame: _walkFrame),
                   ),
                 ],
               ),
@@ -270,30 +394,47 @@ class _MarketGroundPainter extends CustomPainter {
   bool shouldRepaint(covariant _MarketGroundPainter oldDelegate) => false;
 }
 
-/// ตัวละครของผู้เล่น (ลูกค้า) วาดเป็นพิกเซลอาร์ต "chibi portrait" (หัวโต
-/// ผมแหลมสองโทน ตาโตมีประกาย เส้นขอบดำหนา) ตามภาพตัวอย่างที่ผู้ใช้ส่งมา
-/// แทนสไปรต์ RPG แบบเดินเต็มตัวรอบก่อนหน้า — วาดด้วย CustomPaint ทีละ
-/// บล็อกตามตาราง _spriteRows (ดูด้านบนของไฟล์) ไม่ใช้ภาพ/asset จริง
+/// ตัวละครของผู้เล่น (ลูกค้า) วาดเป็นพิกเซลอาร์ตเต็มตัว 4 ทิศตามที่กำลังเดิน
+/// (facing) พร้อมสลับเฟรมขา (walkFrame: 0 ยืนนิ่ง, 1 ก้าวเดิน) ตามภาพ
+/// ตัวอย่างที่ผู้ใช้ส่งมา — ทิศ "right" ใช้สไปรต์เดียวกับ "left" แล้ว mirror
+/// แนวนอนด้วย Transform แทนการวาดสไปรต์แยกอีกชุด (ประหยัดงานออกแบบและตัดความ
+/// เสี่ยงเรื่อง sprite ไม่ตรงกัน) วาดด้วย CustomPaint ทีละบล็อกตามตาราง
+/// สไปรต์ (ดูด้านบนของไฟล์) ไม่ใช้ภาพ/asset จริง
 class _Avatar extends StatelessWidget {
-  const _Avatar();
+  final _Direction facing;
+  final int walkFrame;
+
+  const _Avatar({required this.facing, required this.walkFrame});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final legs = walkFrame == 0 ? _legsIdle : _legsStride;
+    final rows = [..._spriteTopFor(facing), ...legs];
+    final sprite = SizedBox(
       width: _avatarWidth,
       height: _avatarHeight,
-      child: CustomPaint(painter: _PixelSpritePainter()),
+      child: CustomPaint(painter: _PixelSpritePainter(rows)),
+    );
+    if (facing != _Direction.right) return sprite;
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()..scale(-1.0, 1.0),
+      child: sprite,
     );
   }
 }
 
-/// วาดตาราง _spriteRows ทีละ "พิกเซล" เป็นสี่เหลี่ยมทึบขนาด _spritePixel —
-/// เทคนิคเดียวกับ _MarketGroundPainter ด้านบน (Canvas.drawRect ล้วนๆ)
+/// วาดตาราง rows ทีละ "พิกเซล" เป็นสี่เหลี่ยมทึบขนาด _spritePixel — เทคนิค
+/// เดียวกับ _MarketGroundPainter ด้านบน (Canvas.drawRect ล้วนๆ)
 class _PixelSpritePainter extends CustomPainter {
+  final List<String> rows;
+
+  _PixelSpritePainter(this.rows);
+
   @override
   void paint(Canvas canvas, Size size) {
-    for (var y = 0; y < _spriteRows.length; y++) {
-      final row = _spriteRows[y];
+    for (var y = 0; y < rows.length; y++) {
+      final row = rows[y];
       for (var x = 0; x < row.length; x++) {
         final color = _spriteColors[row[x]];
         if (color == null) continue; // '.' หรืออักขระที่ไม่รู้จัก = โปร่งใส
@@ -305,8 +446,11 @@ class _PixelSpritePainter extends CustomPainter {
     }
   }
 
+  // rows เปลี่ยนทุกครั้งที่ facing/walkFrame เปลี่ยน (list instance ใหม่เสมอ)
+  // repaint ใหม่ทุกครั้งไปเลยง่ายกว่าเทียบ content ทีละ element — งานวาดของ
+  // สไปรต์เล็กๆ นี้ถูกมากไม่กระทบ performance
   @override
-  bool shouldRepaint(covariant _PixelSpritePainter oldDelegate) => false;
+  bool shouldRepaint(covariant _PixelSpritePainter oldDelegate) => true;
 }
 
 /// ป้ายร้านค้า 1 ร้านบนแผนที่ — ขยายเล็กน้อย (AnimatedScale) และขอบเปลี่ยนสี
