@@ -225,14 +225,18 @@ class _MarketGroundPainter extends CustomPainter {
 /// ตัวละครของผู้เล่น (ลูกค้า) ออกแบบให้น่ารักสไตล์ชิบิ/kawaii เหมาะกับกลุ่ม
 /// วัยรุ่น — หัวกลมไล่สีชมพู-ม่วงพาสเทล ตากลมโตมีประกาย แก้มแดง และปากยิ้ม
 /// เล็กๆ แทนวงกลมสีทึบพร้อมไอคอนคนเดิน ประกอบจาก widget ล้วนๆ ไม่ใช้ภาพ/asset
-/// (Align ไม่ใช่ Positioned เพราะ Stack ทำ non-positioned child แบบนี้ให้
-/// เต็มพื้นที่แล้วจัดตำแหน่งภายในตาม alignment ได้แน่นอน ไม่ต้องกังวลเรื่อง
-/// left/right ที่ไม่ครบของ Positioned)
+///
+/// ใช้ Positioned ที่ระบุ left/top/width/height ครบทุกค่า (คำนวณเป็นพิกเซล
+/// ตรงๆ จากสัดส่วนของ _avatarSize) แทน Align+alignment fraction — จากที่
+/// golden screenshot รอบแรกออกมาผิดรูป (ไม่ใช่วงกลม) sandbox นี้ไม่มี Flutter
+/// SDK ให้รันเทียบเองได้ เลยเปลี่ยนมาใช้ Positioned แบบระบุค่าครบเพื่อตัด
+/// ความไม่แน่นอนของพฤติกรรม Align ภายใน Stack ที่ตรวจสอบจริงไม่ได้ในนี้ออกไป
 class _Avatar extends StatelessWidget {
   const _Avatar();
 
   static const _faceColor = Color(0xFF6B4A6B);
   static const _blushColor = Color(0xFFFF8FB1);
+  static const _eyeSize = _avatarSize * 0.18;
 
   @override
   Widget build(BuildContext context) {
@@ -251,24 +255,40 @@ class _Avatar extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            const Align(alignment: Alignment(-0.6, 0.35), child: _Blush()),
-            const Align(alignment: Alignment(0.6, 0.35), child: _Blush()),
-            Align(
-              alignment: const Alignment(0, -0.15),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const _Eye(),
-                  SizedBox(width: _avatarSize * 0.14),
-                  const _Eye(),
-                ],
+            // แก้มซ้าย
+            Positioned(
+              left: _avatarSize * 0.172,
+              top: _avatarSize * 0.614,
+              width: _avatarSize * 0.14,
+              height: _avatarSize * 0.09,
+              child: const _Blush(),
+            ),
+            // แก้มขวา
+            Positioned(
+              left: _avatarSize * 0.688,
+              top: _avatarSize * 0.614,
+              width: _avatarSize * 0.14,
+              height: _avatarSize * 0.09,
+              child: const _Blush(),
+            ),
+            // แถวตาทั้งสองข้าง (กว้างรวม = 2 ตา + ช่องว่างตรงกลาง)
+            Positioned(
+              left: _avatarSize * 0.125,
+              top: _avatarSize * 0.3485,
+              width: _avatarSize * 0.5,
+              height: _eyeSize,
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [_Eye(), _Eye()],
               ),
             ),
-            Align(
-              alignment: const Alignment(0, 0.55),
+            // ปาก
+            Positioned(
+              left: _avatarSize * 0.195,
+              top: _avatarSize * 0.705,
+              width: _avatarSize * 0.22,
+              height: _avatarSize * 0.09,
               child: Container(
-                width: _avatarSize * 0.22,
-                height: _avatarSize * 0.09,
                 decoration: BoxDecoration(
                   color: _faceColor,
                   borderRadius: BorderRadius.circular(_avatarSize * 0.05),
@@ -286,6 +306,9 @@ class _Avatar extends StatelessWidget {
 class _Eye extends StatelessWidget {
   const _Eye();
 
+  static const _pupilSize = _avatarSize * 0.1;
+  static const _highlightSize = _avatarSize * 0.04;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -294,16 +317,20 @@ class _Eye extends StatelessWidget {
       decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
       child: Stack(
         children: [
-          const Align(
-            alignment: Alignment.center,
-            child: _Pupil(),
+          Positioned(
+            left: _avatarSize * 0.04,
+            top: _avatarSize * 0.04,
+            width: _pupilSize,
+            height: _pupilSize,
+            child: const _Pupil(),
           ),
-          Align(
-            alignment: const Alignment(-0.3, -0.4),
-            child: Container(
-              width: _avatarSize * 0.04,
-              height: _avatarSize * 0.04,
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+          Positioned(
+            left: _avatarSize * 0.049,
+            top: _avatarSize * 0.042,
+            width: _highlightSize,
+            height: _highlightSize,
+            child: const DecoratedBox(
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white),
             ),
           ),
         ],
@@ -317,10 +344,8 @@ class _Pupil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: _avatarSize * 0.1,
-      height: _avatarSize * 0.1,
-      decoration: const BoxDecoration(shape: BoxShape.circle, color: _Avatar._faceColor),
+    return const DecoratedBox(
+      decoration: BoxDecoration(shape: BoxShape.circle, color: _Avatar._faceColor),
     );
   }
 }
@@ -331,9 +356,7 @@ class _Blush extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: _avatarSize * 0.14,
-      height: _avatarSize * 0.09,
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: _Avatar._blushColor.withOpacity(0.7),
         borderRadius: BorderRadius.circular(_avatarSize * 0.05),

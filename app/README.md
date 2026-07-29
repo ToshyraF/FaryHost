@@ -71,8 +71,17 @@ that's never been run — see "Status") wasn't worth the risk for what a
 The avatar (`_Avatar` in `market_map_screen.dart`) is a cute chibi/kawaii
 face aimed at a teen audience — pastel pink-to-purple gradient head, big
 sparkly eyes, blush, small smile — instead of a plain colored circle, built
-entirely from nested `Container`/`Align`/`Stack` widgets (no image assets,
-same constraint as above).
+entirely from nested `Container`/`DecoratedBox`/`Stack` widgets (no image
+assets, same constraint as above). Face parts are positioned with
+`Positioned` giving all four of `left`/`top`/`width`/`height` explicitly
+(hand-computed pixel offsets from `_avatarSize`), not `Align` — an earlier
+version used `Align` with fractional alignment inside the `Stack`, which
+rendered as a distorted, non-circular shape in the actual `flutter test`
+golden render (only caught by reading the CI artifact, since this sandbox
+has no Flutter SDK to render it directly). `Positioned` with every value
+given is unambiguous regardless of that; `Align`'s "expand to fill loose
+constraints, then place child by fraction" behavior turned out not to work
+the way it was reasoned about here.
 
 ### Experimental: Flame version
 
