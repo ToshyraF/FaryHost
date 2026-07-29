@@ -80,11 +80,13 @@ before it actually renders correctly; that's the plan, not a sign
 something's wrong. It deliberately doesn't replace `MarketMapScreen` so the
 app keeps a working customer experience regardless of how that shakes out.
 The camera follows the player vertically and is clamped to the map's
-extent (`camera.follow(player, verticalOnly: true)` + `camera.setBounds(...)`
-in `market_flame_game.dart`), so a map taller than the viewport (more
-vendors than fit on screen at once) scrolls as the player walks toward the
-bottom rows instead of clipping — no horizontal follow since the grid's
-fixed column count always fits the screen width exactly.
+extent (`camera.follow(player, verticalOnly: true)` in `onLoad`, plus a
+manual clamp of `camera.viewfinder.position.y` in `update()` — not
+`camera.setBounds`, whose bounds-shape API/import didn't match the Flame
+version CI resolves) in `market_flame_game.dart`, so a map taller than the
+viewport (more vendors than fit on screen at once) scrolls as the player
+walks toward the bottom rows instead of clipping — no horizontal follow
+since the grid's fixed column count always fits the screen width exactly.
 
 ## Payment
 

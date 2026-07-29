@@ -4,7 +4,6 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
-import 'package:flame/geometry.dart';
 import 'package:flutter/material.dart' show Colors, Curves, TextStyle;
 
 import '../../../core/models/vendor.dart';
@@ -32,6 +31,7 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   MarketFlameGame({required this.vendors, required this.onOpenVendor});
 
   late final PlayerComponent player;
+  late final double _worldHeight;
 
   @override
   Color backgroundColor() => const Color(0xFFF3E5C8);
@@ -41,6 +41,7 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
     await super.onLoad();
 
     final mapHeight = _mapHeight(vendors.length);
+    _worldHeight = mapHeight;
     final cellWidth = size.x / _columns;
 
     // ทางเดินสีเข้มขึ้นสลับกับพื้นตลาด (สีพื้นมาจาก backgroundColor() ด้านบน)
@@ -74,10 +75,24 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
 
     // แผนที่สูงกว่าจอได้เมื่อร้านค้าเยอะ (mapHeight ขึ้นกับจำนวนร้าน) ให้กล้อง
     // เลื่อนตามตัวละครในแนวตั้ง (verticalOnly: true เพราะแนวนอนแคบพอดีจอเสมอ
-    // อยู่แล้ว จาก _columns คงที่) และ setBounds กันไม่ให้กล้องเลื่อนเกินขอบ
-    // แผนที่จนเห็นพื้นที่ว่างเปล่านอกแผนที่
-    camera.setBounds(Rectangle.fromLTWH(0, 0, size.x, mapHeight));
+    // อยู่แล้ว จาก _columns คงที่) ส่วนการกันไม่ให้เลื่อนเกินขอบแผนที่ทำเองใน
+    // update() ด้านล่าง แทนการใช้ camera.setBounds — API นั้นต้องพึ่ง shape
+    // class ของ Flame ที่ชื่อ/ที่ import ไม่ตรงกับเวอร์ชันที่ resolve จริงบน CI
     camera.follow(player, verticalOnly: true);
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    final halfHeight = size.y / 2;
+    final minY = halfHeight;
+    final maxY = _worldHeight - halfHeight;
+    if (maxY > minY) {
+      camera.viewfinder.position.y = camera.viewfinder.position.y.clamp(minY, maxY);
+    } else {
+      // แผนที่เตี้ยกว่าจอ (ร้านค้าน้อย) ไม่ต้อง scroll เลย ตรึงกล้องไว้กลางแผนที่
+      camera.viewfinder.position.y = _worldHeight / 2;
+    }
   }
 
   @override
