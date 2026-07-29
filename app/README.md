@@ -138,10 +138,28 @@ on the stall doesn't also fire the proximity trigger right after.
 `PlayerComponent` uses the same licensed sprite sheet as the widget
 version's `CharacterSprite` (see "Market map" above for the source/license)
 rather than loading it through Flame's own `Images` asset cache — it reads
-the bytes itself via `rootBundle.load(assetPath)` + `decodeImageFromList`
-in `onLoad()`, so it doesn't need to adopt Flame's asset-path-prefix
-convention just to reuse a path already declared in `pubspec.yaml` for the
-widget version. `render(Canvas canvas)` then does a single
+the bytes itself via `rootBundle.load(assetPath)` + `instantiateImageCodec`,
+so it doesn't need to adopt Flame's asset-path-prefix convention just to
+reuse a path already declared in `pubspec.yaml` for the widget version.
+The decode happens in `MarketFlameGame.onLoad()`, not `PlayerComponent`'s
+own `onLoad()` — the first version decoded it in the component itself and
+a user-uploaded golden screenshot showed the player completely invisible,
+because the golden test's fixed pump count could finish before that async
+decode did and `render()` skipped drawing while the image was still null.
+Since Flame doesn't consider a `FlameGame` ready to render until its own
+`onLoad()` future completes, awaiting the decode there and passing the
+already-decoded `Image` into `PlayerComponent`'s constructor guarantees the
+sprite is ready before the first frame, no race possible. The vendor name
+labels had a matching but separate bug — `TextComponent`'s `TextPaint`
+didn't specify `fontFamily: 'Loma'`, so Thai stall names rendered as empty
+boxes too (Flame text doesn't inherit the app's `ThemeData` the way a
+widget `Text` does); fixed by setting it explicitly, same as
+`flutter_test_config.dart` already does for the widget-tree side. Neither
+of these threw an exception, so `flutter test --update-goldens` reported
+them as passing — only a real screenshot revealed the problem, which is
+why the CI-driven "expect it to need a fix or two" caveat above only
+covers compile/runtime errors, not silently-wrong renders. `render(Canvas
+canvas)` does a single
 `canvas.drawImageRect(sheet, srcRect, dstRect, ...)` per frame (`srcRect`
 picked by `_facing`'s row and `_walkFrame`'s column) instead of the
 per-pixel `canvas.drawRect` calls the old hand-drawn version used —

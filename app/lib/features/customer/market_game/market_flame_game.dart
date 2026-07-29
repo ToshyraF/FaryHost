@@ -62,6 +62,17 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   Future<void> onLoad() async {
     await super.onLoad();
 
+    // โหลด+decode sprite sheet ของตัวละครที่นี่ (แล้วรอให้เสร็จก่อน) แทนที่จะ
+    // ทำใน PlayerComponent.onLoad() -- ตอนแรกทำในนั้นแล้วพบว่า golden test
+    // ถ่ายภาพตอน component ยังโหลดภาพไม่เสร็จ (ยืนยันจากภาพจริงที่ผู้ใช้ส่งมา
+    // ตัวละครไม่ขึ้นเลย) เพราะ FlameGame ทั้งก้อนจะพร้อม render ก็ต่อเมื่อ
+    // onLoad() ของ MarketFlameGame เองเสร็จสมบูรณ์ก่อน ทำที่นี่แล้ว await จึง
+    // การันตีว่าภาพพร้อมก่อน PlayerComponent จะถูกสร้าง/render เฟรมแรกเลย
+    final characterData = await rootBundle.load(characterAssetPath);
+    final characterCodec = await instantiateImageCodec(characterData.buffer.asUint8List());
+    final characterFrame = await characterCodec.getNextFrame();
+    final characterSheet = characterFrame.image;
+
     final mapHeight = _mapHeight(vendors.length);
     _worldHeight = mapHeight;
     final cellWidth = size.x / _columns;
@@ -97,7 +108,7 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
       add(stall);
     }
 
-    player = PlayerComponent(assetPath: characterAssetPath)..position = Vector2(size.x / 2, _topPadding);
+    player = PlayerComponent(sheet: characterSheet)..position = Vector2(size.x / 2, _topPadding);
     add(player);
 
     // แผนที่สูงกว่าจอได้เมื่อร้านค้าเยอะ (mapHeight ขึ้นกับจำนวนร้าน) ให้กล้อง
@@ -160,21 +171,21 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
 
 /// ตัวละครของผู้เล่น วาดจาก sprite sheet จริงเดียวกับเวอร์ชัน widget (ดู
 /// CharacterSprite/market_map_screen.dart) หันทิศทางตามที่เดิน (แถวในตาราง)
-/// พร้อมไล่เฟรมเดิน (คอลัมน์) ระหว่างเคลื่อนที่ — โหลดภาพเองผ่าน rootBundle +
-/// decodeImageFromList (ไม่ใช้ Flame.images เพราะ asset ประกาศ path เดียวกับ
-/// เวอร์ชัน widget อยู่แล้ว ไม่อยากผูกกับ prefix convention ของ Flame's
-/// images cache) แล้ว render ด้วย canvas.drawImageRect ตรงๆ แทนการซ้อน
+/// พร้อมไล่เฟรมเดิน (คอลัมน์) ระหว่างเคลื่อนที่ — รับภาพที่ decode เสร็จแล้ว
+/// เข้ามาตรงๆ จาก MarketFlameGame.onLoad() (ไม่ decode เองใน onLoad() ของ
+/// component นี้ เพราะรอบแรกที่ทำแบบนั้นพบว่า golden test ถ่ายภาพก่อนโหลด
+/// เสร็จ ตัวละครเลยไม่ขึ้นเลย -- ดูคอมเมนต์ใน MarketFlameGame.onLoad()) แล้ว
+/// render ด้วย canvas.drawImageRect ตรงๆ แทนการซ้อน
 /// CircleComponent/RectangleComponent หลายชิ้น ลดความเสี่ยงจาก API ที่ไม่เคย
 /// ยืนยันในเวอร์ชัน Flame ที่ resolve จริง (render(Canvas) เป็น core API ของ
 /// Component ที่เสถียรมาก ทุก shape component ที่ใช้อยู่แล้วในไฟล์นี้ก็
 /// implement มันแบบเดียวกันนี้อยู่แล้วภายใน)
 class PlayerComponent extends PositionComponent {
-  final String assetPath;
+  final Image sheet;
 
-  PlayerComponent({required this.assetPath})
+  PlayerComponent({required this.sheet})
       : super(size: Vector2.all(_playerDisplaySize), anchor: Anchor.center);
 
-  Image? _sheet;
   _Direction _facing = _Direction.down;
   int _walkFrame = 0;
   // Timer จาก dart:async ต้อง alias เพราะ package:flame/components.dart
@@ -184,19 +195,8 @@ class PlayerComponent extends PositionComponent {
   async_lib.Timer? _walkTimer;
 
   @override
-  Future<void> onLoad() async {
-    await super.onLoad();
-    final data = await rootBundle.load(assetPath);
-    final codec = await instantiateImageCodec(data.buffer.asUint8List());
-    final frame = await codec.getNextFrame();
-    _sheet = frame.image;
-  }
-
-  @override
   void render(Canvas canvas) {
     super.render(canvas);
-    final sheet = _sheet;
-    if (sheet == null) return; // ยังโหลดภาพไม่เสร็จ ข้ามเฟรมนี้ไปก่อน
     final src = Rect.fromLTWH(
       _walkFrame * _frameSize,
       _facing.spriteRow * _frameSize,
@@ -273,7 +273,10 @@ class StallComponent extends PositionComponent with TapCallbacks {
         text: vendor.name,
         anchor: Anchor.topCenter,
         position: Vector2(_stallSize / 2, _stallSize + 4),
-        textRenderer: TextPaint(style: const TextStyle(fontSize: 12, color: Colors.black)),
+        // fontFamily ต้องระบุ 'Loma' ตรงๆ เพราะ Flame's TextComponent ไม่ได้
+        // สืบทอด ThemeData ของแอป (ต่างจาก widget ปกติที่ได้ฟอนต์ default จาก
+        // buildAppTheme() อัตโนมัติ) ไม่งั้นชื่อร้านภาษาไทยจะขึ้นเป็นกล่องเปล่า
+        textRenderer: TextPaint(style: const TextStyle(fontSize: 12, color: Colors.black, fontFamily: 'Loma')),
       ),
     );
   }
