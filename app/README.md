@@ -68,6 +68,12 @@ assets, and adding an untested new package (on top of everything else
 that's never been run — see "Status") wasn't worth the risk for what a
 `CustomPainter` can already do for the default experience.
 
+The avatar (`_Avatar` in `market_map_screen.dart`) is a cute chibi/kawaii
+face aimed at a teen audience — pastel pink-to-purple gradient head, big
+sparkly eyes, blush, small smile — instead of a plain colored circle, built
+entirely from nested `Container`/`Align`/`Stack` widgets (no image assets,
+same constraint as above).
+
 ### Experimental: Flame version
 
 `lib/features/customer/market_game/` is the same map re-implemented on top
@@ -96,6 +102,11 @@ Same proximity auto-open as the widget version: each `StallComponent` has a
 walking close opens that stall's menu once per approach; tapping a stall
 directly sets `wasNear = true` immediately so the walk-in animation landing
 on the stall doesn't also fire the proximity trigger right after.
+`PlayerComponent` gets the same chibi/kawaii face as the widget version's
+`_Avatar` (pastel body, eyes, blush), built from nested `CircleComponent`s
+the same proven way `StallComponent` already composites its own circles and
+text — no gradient/shader on this side, to avoid adding another
+never-locally-verified Flame API surface on top of what's already there.
 
 ## Payment
 

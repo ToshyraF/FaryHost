@@ -222,9 +222,17 @@ class _MarketGroundPainter extends CustomPainter {
   bool shouldRepaint(covariant _MarketGroundPainter oldDelegate) => false;
 }
 
-/// ตัวละครของผู้เล่น (ลูกค้า) แสดงเป็นวงกลมสีพร้อมไอคอนคนเดิน
+/// ตัวละครของผู้เล่น (ลูกค้า) ออกแบบให้น่ารักสไตล์ชิบิ/kawaii เหมาะกับกลุ่ม
+/// วัยรุ่น — หัวกลมไล่สีชมพู-ม่วงพาสเทล ตากลมโตมีประกาย แก้มแดง และปากยิ้ม
+/// เล็กๆ แทนวงกลมสีทึบพร้อมไอคอนคนเดิน ประกอบจาก widget ล้วนๆ ไม่ใช้ภาพ/asset
+/// (Align ไม่ใช่ Positioned เพราะ Stack ทำ non-positioned child แบบนี้ให้
+/// เต็มพื้นที่แล้วจัดตำแหน่งภายในตาม alignment ได้แน่นอน ไม่ต้องกังวลเรื่อง
+/// left/right ที่ไม่ครบของ Positioned)
 class _Avatar extends StatelessWidget {
   const _Avatar();
+
+  static const _faceColor = Color(0xFF6B4A6B);
+  static const _blushColor = Color(0xFFFF8FB1);
 
   @override
   Widget build(BuildContext context) {
@@ -232,12 +240,103 @@ class _Avatar extends StatelessWidget {
       width: _avatarSize,
       height: _avatarSize,
       child: DecoratedBox(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          color: Theme.of(context).colorScheme.primary,
-          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFB6E6), Color(0xFFB6A8FF)],
+          ),
+          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))],
         ),
-        child: const Icon(Icons.directions_walk, color: Colors.white),
+        child: Stack(
+          children: [
+            const Align(alignment: Alignment(-0.6, 0.35), child: _Blush()),
+            const Align(alignment: Alignment(0.6, 0.35), child: _Blush()),
+            Align(
+              alignment: const Alignment(0, -0.15),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const _Eye(),
+                  SizedBox(width: _avatarSize * 0.14),
+                  const _Eye(),
+                ],
+              ),
+            ),
+            Align(
+              alignment: const Alignment(0, 0.55),
+              child: Container(
+                width: _avatarSize * 0.22,
+                height: _avatarSize * 0.09,
+                decoration: BoxDecoration(
+                  color: _faceColor,
+                  borderRadius: BorderRadius.circular(_avatarSize * 0.05),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ตาข้างหนึ่งของตัวละคร: วงกลมขาว + รูม่านตาสีเข้ม + จุดประกายเล็กๆ
+class _Eye extends StatelessWidget {
+  const _Eye();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _avatarSize * 0.18,
+      height: _avatarSize * 0.18,
+      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+      child: Stack(
+        children: [
+          const Align(
+            alignment: Alignment.center,
+            child: _Pupil(),
+          ),
+          Align(
+            alignment: const Alignment(-0.3, -0.4),
+            child: Container(
+              width: _avatarSize * 0.04,
+              height: _avatarSize * 0.04,
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Pupil extends StatelessWidget {
+  const _Pupil();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _avatarSize * 0.1,
+      height: _avatarSize * 0.1,
+      decoration: const BoxDecoration(shape: BoxShape.circle, color: _Avatar._faceColor),
+    );
+  }
+}
+
+/// แก้มแดงข้างหนึ่ง
+class _Blush extends StatelessWidget {
+  const _Blush();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _avatarSize * 0.14,
+      height: _avatarSize * 0.09,
+      decoration: BoxDecoration(
+        color: _Avatar._blushColor.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(_avatarSize * 0.05),
       ),
     );
   }

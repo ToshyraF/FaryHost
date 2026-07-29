@@ -138,18 +138,65 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   }
 }
 
-/// ตัวละครของผู้เล่น — วงกลมสีพร้อม effect เดินแบบ animate ไปยังจุดที่แตะ
+/// ตัวละครของผู้เล่น ออกแบบให้น่ารักสไตล์ชิบิ/kawaii เหมือน _Avatar ใน
+/// เวอร์ชัน widget — ตัวกลมสีพาสเทล ตากลมมีประกาย แก้มแดง แทนวงกลมสีทึบ
+/// เรียบๆ พร้อม effect เดินแบบ animate ไปยังจุดที่แตะ ประกอบจาก CircleComponent
+/// ซ้อนกันหลายชั้น (แบบเดียวกับที่ StallComponent ใช้อยู่แล้วและ build ผ่าน
+/// บน CI มาแล้ว) ไม่ใช้ gradient/shader เพื่อลดความเสี่ยงจาก API ที่ไม่เคย
+/// ยืนยันในเวอร์ชัน Flame ที่ resolve จริง
 class PlayerComponent extends PositionComponent {
   PlayerComponent() : super(size: Vector2.all(_playerSize), anchor: Anchor.center);
+
+  static const _bodyColor = Color(0xFFD9B3FF);
+  static const _faceColor = Color(0xFF6B4A6B);
+  static const _blushColor = Color(0xFFFF8FB1);
 
   @override
   Future<void> onLoad() async {
     add(
       CircleComponent(
         radius: _playerSize / 2,
-        paint: Paint()..color = const Color(0xFF1565C0),
+        paint: Paint()..color = _bodyColor,
       ),
     );
+
+    for (final dx in [-_playerSize * 0.18, _playerSize * 0.18]) {
+      addAll(_eyeParts(Vector2(_playerSize / 2 + dx, _playerSize * 0.42)));
+    }
+
+    for (final dx in [-_playerSize * 0.24, _playerSize * 0.24]) {
+      add(
+        CircleComponent(
+          radius: _playerSize * 0.09,
+          anchor: Anchor.center,
+          position: Vector2(_playerSize / 2 + dx, _playerSize * 0.66),
+          paint: Paint()..color = _blushColor.withOpacity(0.7),
+        ),
+      );
+    }
+  }
+
+  List<Component> _eyeParts(Vector2 center) {
+    return [
+      CircleComponent(
+        radius: _playerSize * 0.09,
+        anchor: Anchor.center,
+        position: center,
+        paint: Paint()..color = Colors.white,
+      ),
+      CircleComponent(
+        radius: _playerSize * 0.05,
+        anchor: Anchor.center,
+        position: center,
+        paint: Paint()..color = _faceColor,
+      ),
+      CircleComponent(
+        radius: _playerSize * 0.02,
+        anchor: Anchor.center,
+        position: Vector2(center.x - _playerSize * 0.02, center.y - _playerSize * 0.02),
+        paint: Paint()..color = Colors.white,
+      ),
+    ];
   }
 
   void walkTo(Vector2 target) {
