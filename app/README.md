@@ -68,45 +68,36 @@ assets, and adding an untested new package (on top of everything else
 that's never been run — see "Status") wasn't worth the risk for what a
 `CustomPainter` can already do for the default experience.
 
-The avatar (`_Avatar` in `market_map_screen.dart`) is a full-body pixel-art
-character — curly two-tone hair, blue jacket, grey pants, maroon shoes,
-bold black outline — modeled on a 3x3 reference sprite sheet the user
-shared showing one character across nine poses/directions (an original
-design in that style, not a copy). It walks: tapping the map picks a
-facing direction (down/up/left/right) from the movement vector and plays a
-2-frame leg walk-cycle while moving. It's drawn by `_PixelSpritePainter`, a
-`CustomPainter` that fills one small `Rect` per character in a string grid
-(`.` meaning transparent) — no image assets, same constraint as everywhere
-else in this app. There are three top-half grids (`_spriteTopDown`,
-`_spriteTopUp`, `_spriteTopLeft`) and two leg grids (`_legsIdle`,
-`_legsStride`, appended below whichever top matches the current facing);
-"right" reuses `_spriteTopLeft` horizontally mirrored via
-`Transform(..scale(-1.0, 1.0))` rather than a fourth hand-drawn direction,
-since the sprite is symmetric enough for a flip to read correctly. Facing
-and walk-frame are tracked in `_MarketMapScreenState` (`_facing`,
-`_walkFrame`) and driven by a `Timer.periodic` (120ms frame swap, 350ms
-total) started each time `_moveAvatarTo` sees real movement.
+The avatar is a real pixel-art sprite sheet, not hand-drawn — a hand-coded
+`CustomPainter` grid was the approach through several earlier redesigns
+(chibi portrait, then an original full-body character) while this sandbox
+had no way to fetch or verify an actual image asset, but the user later
+supplied a licensed sprite pack directly (upload, not a fetched URL), which
+removed that constraint. `assets/sprites/character_01.png` through
+`character_10.png` are the "character overworld" sprites from *MyPixelWorld
+Special Pack 01* (MPWSP01) by scarloxy (https://scarloxy.itch.io/mpwsp01),
+confirmed commercially usable with no attribution requirement per the
+pack's own description — see `assets/sprites/CREDITS.txt` for the full
+license text and provenance. Each sheet is a 128x128 grid of 4x4 frames
+(32x32 each): row 0 = facing down, row 1 = left, row 2 = right, row 3 =
+up/back; columns 0-3 are a 4-frame walk cycle.
 
-All five grids/the palette were designed and checked by rendering them as
-an HTML `<canvas>` and screenshotting with the pre-installed headless
-Chromium before ever touching the Dart code — the same technique used to
-catch and fix the previous shape-based avatar's `Align` bug. Two issues
-surfaced and were fixed this way: the first walk-cycle leg grid varied the
-gap's horizontal position across rows, which rendered as a jagged
-diagonal artifact rather than a clean stride — fixed by keeping the gap's
-column position constant between the idle/stride grids and instead varying
-leg *length* (one leg's block stops a row or two earlier than the other).
-Separately, hand-transcribing the verified HTML grids into Dart introduced
-a copy-paste error (two of the three top-half arrays briefly kept an old,
-unrelated hairline pattern) — caught before commit with a small Node
-script that regex-extracts the `const` array literals from both the Dart
-source and the HTML prototype and diffs them with `JSON.stringify`
-equality, row by row. Any future hand-transcribed pixel grid in this app
-should be verified the same way rather than trusted by eye.
-`_avatarWidth`/`_avatarHeight` are derived from the grids' own dimensions
-(`_spriteTopDown.first.length`/`(_spriteTopDown.length +
-_legsIdle.length)`) rather than hardcoded, so the on-screen size can never
-drift out of sync with the grid.
+`CharacterSprite` (`lib/features/customer/character_sprite.dart`) crops and
+scales one frame from a sheet — `Image.asset` loads the whole sheet,
+`OverflowBox` + `Transform.translate` (an explicit pixel offset, not a
+fractional `Align`, per the lesson from the earlier `Align`-in-`Stack` bug)
+shifts the desired frame into view, and the outer `ClipRect` cuts off the
+rest; `FilterQuality.none` keeps the pixel edges crisp when scaled up.
+`CharacterState` (`lib/core/state/character_state.dart`) persists which of
+the 10 characters the customer picked via `shared_preferences`, the same
+pattern as `AuthState`'s session persistence; `CharacterSelectScreen`
+(reachable from `MarketMapScreen`'s app bar) is a tap-to-pick grid of all
+10 down-facing idle frames. `_MarketMapScreenState` tracks `_facing`
+(down/left/right/up, mapped straight to sheet rows) and `_walkFrame`
+(0-3, mapped to sheet columns) the same way the previous hand-drawn avatar
+did, driven by a `Timer.periodic` (90ms per frame, 350ms total) started
+each time `_moveAvatarTo` sees real movement — only the rendering
+technique changed, not the movement/direction logic.
 
 ### Experimental: Flame version
 
@@ -136,25 +127,23 @@ Same proximity auto-open as the widget version: each `StallComponent` has a
 walking close opens that stall's menu once per approach; tapping a stall
 directly sets `wasNear = true` immediately so the walk-in animation landing
 on the stall doesn't also fire the proximity trigger right after.
-`PlayerComponent` gets the same full-body, 4-direction, walk-animated
-sprite as the widget version's `_Avatar` — the exact same grids/palette,
-copied rather than shared via import so this experimental version stays
-free-standing (verified byte-identical to the widget copy with the same
-Node diff script mentioned above) — drawn by overriding
-`render(Canvas canvas)` directly and calling `canvas.drawRect` per pixel,
-instead of composing `CircleComponent`/`RectangleComponent` children like
-the previous shape-based look did. `render(Canvas)` is the same core hook
-every built-in Flame shape component already implements internally, so
-this is, if anything, less exposed to unverified Flame API surface than
-the child-component approach was. `walkTo()` computes a facing direction
-from the target vs. current position delta (mirroring
-`_moveAvatarTo`'s logic in the widget file) and drives the same
-120ms/350ms `Timer.periodic` walk-cycle; the "right" direction is mirrored
-inside `render()` with `canvas.translate(size.x, 0)` + `canvas.scale(-1,
-1)` around the draw calls (Flame's `Canvas` is the same `dart:ui` canvas
-Flutter uses, so this is the same flip technique as the widget version's
-`Transform`, just applied directly to the canvas instead of wrapping a
-widget).
+`PlayerComponent` uses the same licensed sprite sheet as the widget
+version's `CharacterSprite` (see "Market map" above for the source/license)
+rather than loading it through Flame's own `Images` asset cache — it reads
+the bytes itself via `rootBundle.load(assetPath)` + `decodeImageFromList`
+in `onLoad()`, so it doesn't need to adopt Flame's asset-path-prefix
+convention just to reuse a path already declared in `pubspec.yaml` for the
+widget version. `render(Canvas canvas)` then does a single
+`canvas.drawImageRect(sheet, srcRect, dstRect, ...)` per frame (`srcRect`
+picked by `_facing`'s row and `_walkFrame`'s column) instead of the
+per-pixel `canvas.drawRect` calls the old hand-drawn version used —
+`render(Canvas)` is still the same core hook every built-in Flame shape
+component implements internally, so this stays low-exposure to unverified
+Flame API surface. `walkTo()` computes a facing direction from the target
+vs. current position delta (mirroring `_moveAvatarTo`'s logic in the
+widget file) and drives the same 90ms/350ms `Timer.periodic` walk-cycle;
+unlike the old hand-drawn avatar, "right" doesn't need a mirror transform
+since the sheet already has distinct left/right frames.
 
 ## Payment
 
@@ -186,9 +175,9 @@ golden screenshot would show blank boxes instead of the actual Thai text.
 `test/golden/` has widget-level golden (screenshot) tests for the screens
 that render meaningfully without a live backend: welcome, login, register,
 cart (empty + with items), the market map (both the widget version and the
-experimental Flame version), the vendor list, order status (both the
-awaiting-payment QR view and the post-payment pickup-code view), and the
-vendor create-stall form. Screens that need data mock the network via
+experimental Flame version), the character select grid, the vendor list,
+order status (both the awaiting-payment QR view and the post-payment
+pickup-code view), and the vendor create-stall form. Screens that need data mock the network via
 `package:http/testing.dart`'s `MockClient` (see
 `vendor_list_screen_test.dart`, `order_status_screen_test.dart`,
 `vendor_create_stall_screen_test.dart` for the pattern) — `test_helpers.dart`'s

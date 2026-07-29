@@ -25,6 +25,20 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Customer avatar sprite sheets (4 directions x 4 walk frames, 32x32 each)
+  # -- licensed for commercial use, no attribution required; see
+  # assets/sprites/CREDITS.txt for the source and full license text.
+  assets:
+    - assets/sprites/character_01.png
+    - assets/sprites/character_02.png
+    - assets/sprites/character_03.png
+    - assets/sprites/character_04.png
+    - assets/sprites/character_05.png
+    - assets/sprites/character_06.png
+    - assets/sprites/character_07.png
+    - assets/sprites/character_08.png
+    - assets/sprites/character_09.png
+    - assets/sprites/character_10.png
   # Bundled so Thai text renders consistently across platforms and, more
   # importantly here, in golden tests (the flutter_tester test environment
   # has no real fonts unless the app explicitly ships one — see

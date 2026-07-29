@@ -1,0 +1,16 @@
+Character overworld sprites (character_01.png .. character_10.png)
+
+Source: "MyPixelWorld Special Pack 01" (MPWSP01) by scarloxy
+         https://scarloxy.itch.io/mpwsp01
+Contact: Discord scarloxy / ismaelgarcia.scarloxy@gmail.com
+
+License (per the pack's description on itch.io, confirmed 2026-07-29):
+"In this free pack ... this pack is fully original and can be used
+commercially." No attribution requirement stated.
+
+Each sheet is a 128x128 grid of 4x4 frames (32x32 each): row 0 = facing
+down, row 1 = facing left, row 2 = facing right, row 3 = facing up/back;
+columns 0-3 are the walk cycle.
+
+Not bundled as a Flutter asset (not declared in pubspec.yaml) -- this file
+is documentation only, kept alongside the sprites it describes.

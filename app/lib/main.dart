@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'core/api_client.dart';
 import 'core/state/auth_state.dart';
 import 'core/state/cart_state.dart';
+import 'core/state/character_state.dart';
 import 'core/theme.dart';
 import 'features/auth/welcome_screen.dart';
 import 'features/customer/market_map_screen.dart';
@@ -29,6 +30,7 @@ class FaryHostApp extends StatelessWidget {
         Provider<ApiClient>.value(value: apiClient),
         ChangeNotifierProvider(create: (_) => AuthState(apiClient)),
         ChangeNotifierProvider(create: (_) => CartState()),
+        ChangeNotifierProvider(create: (_) => CharacterState()),
       ],
       child: MaterialApp(
         title: 'FaryHost',

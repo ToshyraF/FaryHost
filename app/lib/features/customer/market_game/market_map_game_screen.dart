@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/models/vendor.dart';
+import '../../../core/state/character_state.dart';
 import '../vendor_menu_screen.dart';
 import 'market_flame_game.dart';
 
@@ -48,6 +49,7 @@ class _MarketMapGameScreenState extends State<MarketMapGameScreen> {
           return GameWidget(
             game: MarketFlameGame(
               vendors: vendors,
+              characterAssetPath: context.read<CharacterState>().selected.assetPath,
               onOpenVendor: (vendor) => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => VendorMenuScreen(vendorId: vendor.id)),
               ),

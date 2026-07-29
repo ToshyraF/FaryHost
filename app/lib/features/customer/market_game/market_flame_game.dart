@@ -6,6 +6,7 @@ import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart' show Colors, Curves, TextStyle;
+import 'package:flutter/services.dart' show rootBundle;
 
 import '../../../core/models/vendor.dart';
 
@@ -16,122 +17,19 @@ const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
 
-// ตัวละครพิกเซลอาร์ตเต็มตัว 4 ทิศทาง + 2 เฟรมเดิน เดียวกับเวอร์ชัน widget (ดู
-// _spriteTopDown/_spriteTopUp/_spriteTopLeft/_legsIdle/_legsStride ใน
-// market_map_screen.dart) — คัดลอกตาราง/พาเลตสีมาตรงๆ แทนการ import ข้ามไฟล์
-// เพื่อให้เวอร์ชันทดลองนี้ยังแยกอิสระจากเวอร์ชัน widget เหมือนเดิม (จะได้ลบทิ้ง
-// ได้ง่ายถ้าการทดลอง Flame ไม่ไปต่อ)
-const _spritePixel = 3.0;
-const _spriteTopDown = <String>[
-  '......OObbOO........',
-  '.....ObbbbbbO.......',
-  '....ObbBBbbBBbO.....',
-  '...ObbbbbbbbbbbO....',
-  '..ObbBBbbbbBBbbbO...',
-  '.ObbbbbbbbbbbbbbbO..',
-  '.ObbbbbbbbbbbbbbbO..',
-  'ObbbbbbbbbbbbbbbbbO.',
-  'ObbbOOOOOOOOOOObbbO.',
-  'ObbOFFFFFFFFFFFObbO.',
-  '.ObOFFFEeFFeEFFObO..',
-  '.ObOFFFFFFFFFFObO...',
-  '..OFFFFFFFFFFFO.....',
-  '...OFFFmmmmFFO......',
-  '....OFFFFFFFO.......',
-  '......OOOOOO........',
-  '.....OJJJJJJO.......',
-  '....OJJjJJjJJO......',
-  '....OJJJJJJJJO......',
-];
-const _spriteTopUp = <String>[
-  '......OObbOO........',
-  '.....ObbbbbbO.......',
-  '....ObbBBbbBBbO.....',
-  '...ObbbbbbbbbbbO....',
-  '..ObbBBbbbbBBbbbO...',
-  '.ObbbbbbbbbbbbbbbO..',
-  '.ObbbbbbbbbbbbbbbO..',
-  'ObbbbbbbbbbbbbbbbbO.',
-  'ObbbbbbBBbbBBbbbbbO.',
-  'ObbbbbbbbbbbbbbbbbO.',
-  '.ObbbbbbbbbbbbbbbO..',
-  '.ObbbbbbbbbbbbbbbO..',
-  '..ObbbbbbbbbbbbbO...',
-  '...ObbbbbbbbbbbO....',
-  '....ObbbbbbbbbO.....',
-  '......OOOOOO........',
-  '.....OJJJJJJO.......',
-  '....OJJjJJjJJO......',
-  '....OJJJJJJJJO......',
-];
-const _spriteTopLeft = <String>[
-  '.....OObbOO.........',
-  '....ObbbbbbO........',
-  '...ObbBBbbBBbO......',
-  '..ObbbbbbbbbbbO.....',
-  '.ObbBBbbbbbbbbO.....',
-  '.ObbbbbbbbbbbbO.....',
-  'ObbbbbbbbbbbbbO.....',
-  'ObbbbbbbbbbbbbO.....',
-  'ObbbOOOOOOObbbO.....',
-  'ObbOFFFFFFFObbO.....',
-  '.ObOFFEeFFFObO......',
-  '.ObOFFFFFFFObO......',
-  '..OFFFFFFFFO........',
-  '...OFFmmFFO.........',
-  '....OFFFFO..........',
-  '......OOOO..........',
-  '.....OJJJJO.........',
-  '....OJJjJJJO........',
-  '....OJJJJJJO........',
-];
-const _legsIdle = <String>[
-  '....OGGGGGGGGO......',
-  '....OGGGGGGGGO......',
-  '.....OGG..GGO.......',
-  '.....OGG..GGO.......',
-  '.....ORR..RRO.......',
-  '......OO..OO........',
-];
-const _legsStride = <String>[
-  '....OGGGGGGGGO......',
-  '.....OGG..GGO.......',
-  '.....OGG..GGO.......',
-  '.....OGG..RRO.......',
-  '.....ORR....O.......',
-  '......OO............',
-];
-const _spriteColors = <String, Color>{
-  'O': Color(0xFF141414),
-  'b': Color(0xFF8A6A5C),
-  'B': Color(0xFFB08E7C),
-  'F': Color(0xFFFFDDBB),
-  'E': Color(0xFF241812),
-  'e': Color(0xFFFFFFFF),
-  'm': Color(0xFF8A4A3A),
-  'J': Color(0xFF5C7A9C),
-  'j': Color(0xFF425E7C),
-  'G': Color(0xFF9A9A9A),
-  'R': Color(0xFF5C2020),
-};
+const _playerDisplaySize = 56.0;
 
-enum _Direction { down, up, left, right }
+// sprite sheet ตาราง 4x4 เฟรม 32x32: แถว 0=ลง(หน้า), 1=ซ้าย, 2=ขวา, 3=ขึ้น
+// (หลัง), คอลัมน์ 0-3 คือ walk cycle — เดียวกับเวอร์ชัน widget (ดู
+// market_map_screen.dart/character_sprite.dart) ที่มา/สิทธิ์การใช้งานอยู่ใน
+// assets/sprites/CREDITS.txt
+const _frameSize = 32.0;
 
-List<String> _spriteTopFor(_Direction direction) {
-  switch (direction) {
-    case _Direction.down:
-      return _spriteTopDown;
-    case _Direction.up:
-      return _spriteTopUp;
-    case _Direction.left:
-    case _Direction.right:
-      return _spriteTopLeft;
-  }
+enum _Direction { down, left, right, up }
+
+extension on _Direction {
+  int get spriteRow => index;
 }
-
-// เป็น final ไม่ใช่ const เพราะ .length ไม่ใช่ compile-time constant expression
-final _playerWidth = _spriteTopDown.first.length * _spritePixel;
-final _playerHeight = (_spriteTopDown.length + _legsIdle.length) * _spritePixel;
 
 /// เวอร์ชันทดลองของแผนที่ตลาด สร้างด้วย Flame (Flutter game engine) แทนการ
 /// วาดด้วย widget ล้วนๆ เหมือน MarketMapScreen ปกติ — โครงเดียวกัน (ตัวละคร
@@ -145,8 +43,13 @@ final _playerHeight = (_spriteTopDown.length + _legsIdle.length) * _spritePixel;
 class MarketFlameGame extends FlameGame with TapCallbacks {
   final List<Vendor> vendors;
   final void Function(Vendor vendor) onOpenVendor;
+  final String characterAssetPath;
 
-  MarketFlameGame({required this.vendors, required this.onOpenVendor});
+  MarketFlameGame({
+    required this.vendors,
+    required this.onOpenVendor,
+    required this.characterAssetPath,
+  });
 
   late final PlayerComponent player;
   late final double _worldHeight;
@@ -194,7 +97,7 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
       add(stall);
     }
 
-    player = PlayerComponent()..position = Vector2(size.x / 2, _topPadding);
+    player = PlayerComponent(assetPath: characterAssetPath)..position = Vector2(size.x / 2, _topPadding);
     add(player);
 
     // แผนที่สูงกว่าจอได้เมื่อร้านค้าเยอะ (mapHeight ขึ้นกับจำนวนร้าน) ให้กล้อง
@@ -255,17 +158,23 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   }
 }
 
-/// ตัวละครของผู้เล่น วาดเป็นพิกเซลอาร์ตเต็มตัวเดียวกับเวอร์ชัน widget (ดู
-/// _Avatar/_PixelSpritePainter ใน market_map_screen.dart) หันทิศทางตามที่เดิน
-/// (บน/ล่าง/ซ้าย ใช้ตารางของตัวเอง, ขวา mirror จากซ้าย) พร้อมขา 2 เฟรมสลับกัน
-/// ระหว่างเดิน — override render() วาด Canvas.drawRect ทีละบล็อกตามตาราง
-/// โดยตรง แทนการซ้อน CircleComponent/RectangleComponent หลายชิ้น ลดความเสี่ยง
-/// จาก API ที่ไม่เคยยืนยันในเวอร์ชัน Flame ที่ resolve จริง (render(Canvas)
-/// เป็น core API ของ Component ที่เสถียรมาก ทุก shape component ที่ใช้อยู่แล้ว
-/// ในไฟล์นี้ก็ implement มันแบบเดียวกันนี้อยู่แล้วภายใน)
+/// ตัวละครของผู้เล่น วาดจาก sprite sheet จริงเดียวกับเวอร์ชัน widget (ดู
+/// CharacterSprite/market_map_screen.dart) หันทิศทางตามที่เดิน (แถวในตาราง)
+/// พร้อมไล่เฟรมเดิน (คอลัมน์) ระหว่างเคลื่อนที่ — โหลดภาพเองผ่าน rootBundle +
+/// decodeImageFromList (ไม่ใช้ Flame.images เพราะ asset ประกาศ path เดียวกับ
+/// เวอร์ชัน widget อยู่แล้ว ไม่อยากผูกกับ prefix convention ของ Flame's
+/// images cache) แล้ว render ด้วย canvas.drawImageRect ตรงๆ แทนการซ้อน
+/// CircleComponent/RectangleComponent หลายชิ้น ลดความเสี่ยงจาก API ที่ไม่เคย
+/// ยืนยันในเวอร์ชัน Flame ที่ resolve จริง (render(Canvas) เป็น core API ของ
+/// Component ที่เสถียรมาก ทุก shape component ที่ใช้อยู่แล้วในไฟล์นี้ก็
+/// implement มันแบบเดียวกันนี้อยู่แล้วภายใน)
 class PlayerComponent extends PositionComponent {
-  PlayerComponent() : super(size: Vector2(_playerWidth, _playerHeight), anchor: Anchor.center);
+  final String assetPath;
 
+  PlayerComponent({required this.assetPath})
+      : super(size: Vector2.all(_playerDisplaySize), anchor: Anchor.center);
+
+  Image? _sheet;
   _Direction _facing = _Direction.down;
   int _walkFrame = 0;
   // Timer จาก dart:async ต้อง alias เพราะ package:flame/components.dart
@@ -275,30 +184,25 @@ class PlayerComponent extends PositionComponent {
   async_lib.Timer? _walkTimer;
 
   @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    final data = await rootBundle.load(assetPath);
+    _sheet = await decodeImageFromList(data.buffer.asUint8List());
+  }
+
+  @override
   void render(Canvas canvas) {
     super.render(canvas);
-    final legs = _walkFrame == 0 ? _legsIdle : _legsStride;
-    final rows = [..._spriteTopFor(_facing), ...legs];
-    final mirror = _facing == _Direction.right;
-    if (mirror) {
-      canvas.save();
-      canvas.translate(size.x, 0);
-      canvas.scale(-1, 1);
-    }
-    for (var y = 0; y < rows.length; y++) {
-      final row = rows[y];
-      for (var x = 0; x < row.length; x++) {
-        final color = _spriteColors[row[x]];
-        if (color == null) continue; // '.' หรืออักขระที่ไม่รู้จัก = โปร่งใส
-        canvas.drawRect(
-          Rect.fromLTWH(x * _spritePixel, y * _spritePixel, _spritePixel, _spritePixel),
-          Paint()..color = color,
-        );
-      }
-    }
-    if (mirror) {
-      canvas.restore();
-    }
+    final sheet = _sheet;
+    if (sheet == null) return; // ยังโหลดภาพไม่เสร็จ ข้ามเฟรมนี้ไปก่อน
+    final src = Rect.fromLTWH(
+      _walkFrame * _frameSize,
+      _facing.spriteRow * _frameSize,
+      _frameSize,
+      _frameSize,
+    );
+    final dst = Rect.fromLTWH(0, 0, size.x, size.y);
+    canvas.drawImageRect(sheet, src, dst, Paint()..filterQuality = FilterQuality.none);
   }
 
   void walkTo(Vector2 target) {
@@ -314,9 +218,9 @@ class PlayerComponent extends PositionComponent {
 
   void _startWalkAnimation() {
     _walkTimer?.cancel();
-    _walkFrame = 1;
-    _walkTimer = async_lib.Timer.periodic(const Duration(milliseconds: 120), (_) {
-      _walkFrame = 1 - _walkFrame;
+    _walkFrame = 0;
+    _walkTimer = async_lib.Timer.periodic(const Duration(milliseconds: 90), (_) {
+      _walkFrame = (_walkFrame + 1) % 4;
     });
     async_lib.Future.delayed(const Duration(milliseconds: 350), () {
       _walkTimer?.cancel();
