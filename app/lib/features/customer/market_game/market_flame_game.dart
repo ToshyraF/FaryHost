@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:async' as async_lib;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
@@ -268,7 +268,11 @@ class PlayerComponent extends PositionComponent {
 
   _Direction _facing = _Direction.down;
   int _walkFrame = 0;
-  Timer? _walkTimer;
+  // Timer จาก dart:async ต้อง alias เพราะ package:flame/components.dart
+  // export คลาสชื่อ Timer ของตัวเองด้วย (flame/src/timer.dart) ซึ่งไม่มี
+  // .periodic()/.cancel() แบบเดียวกัน — ถ้าไม่ alias ชื่อ Timer เปล่าๆ จะ
+  // resolve ไปเป็นของ Flame แทน
+  async_lib.Timer? _walkTimer;
 
   @override
   void render(Canvas canvas) {
@@ -311,10 +315,10 @@ class PlayerComponent extends PositionComponent {
   void _startWalkAnimation() {
     _walkTimer?.cancel();
     _walkFrame = 1;
-    _walkTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
+    _walkTimer = async_lib.Timer.periodic(const Duration(milliseconds: 120), (_) {
       _walkFrame = 1 - _walkFrame;
     });
-    Future.delayed(const Duration(milliseconds: 350), () {
+    async_lib.Future.delayed(const Duration(milliseconds: 350), () {
       _walkTimer?.cancel();
       _walkFrame = 0;
     });
