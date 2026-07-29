@@ -49,6 +49,15 @@ void main() {
     // fixed number of frames manually instead.
     await pumpGolden(tester, const MarketMapGameScreen(), apiClient: client, settle: false);
 
+    // PlayerComponent decodes its sprite sheet via a real async round-trip
+    // through the engine's image codec (rootBundle.load + instantiateImageCodec),
+    // not just a microtask -- tester.pump(duration) only advances the fake
+    // test clock used for Timers/animations, it doesn't guarantee that kind
+    // of real engine callback has actually completed. tester.runAsync() runs
+    // a real event-loop turn so genuine async work like this gets a chance
+    // to finish before the pumps below try to render it.
+    await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)));
+
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }

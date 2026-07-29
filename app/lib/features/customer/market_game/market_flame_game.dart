@@ -62,17 +62,16 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   Future<void> onLoad() async {
     await super.onLoad();
 
-    // โหลด+decode sprite sheet ของตัวละครที่นี่ (แล้วรอให้เสร็จก่อน) แทนที่จะ
-    // ทำใน PlayerComponent.onLoad() -- ตอนแรกทำในนั้นแล้วพบว่า golden test
-    // ถ่ายภาพตอน component ยังโหลดภาพไม่เสร็จ (ยืนยันจากภาพจริงที่ผู้ใช้ส่งมา
-    // ตัวละครไม่ขึ้นเลย) เพราะ FlameGame ทั้งก้อนจะพร้อม render ก็ต่อเมื่อ
-    // onLoad() ของ MarketFlameGame เองเสร็จสมบูรณ์ก่อน ทำที่นี่แล้ว await จึง
-    // การันตีว่าภาพพร้อมก่อน PlayerComponent จะถูกสร้าง/render เฟรมแรกเลย
-    final characterData = await rootBundle.load(characterAssetPath);
-    final characterCodec = await instantiateImageCodec(characterData.buffer.asUint8List());
-    final characterFrame = await characterCodec.getNextFrame();
-    final characterSheet = characterFrame.image;
-
+    // ไม่ await การ decode sprite sheet ของตัวละครตรงนี้ -- เคยลองทำแบบนั้น
+    // (await ก่อนสร้างอย่างอื่นทั้งหมด) แล้วพบว่า GameWidget ทั้งก้อนค้างอยู่ที่
+    // หน้า loading เปล่าๆ จนกว่า onLoad() ทั้งฟังก์ชันจะ resolve เสร็จ -- ไม่ใช่
+    // แค่ PlayerComponent ที่หายไป แต่พื้น/ป้ายร้านก็ไม่ขึ้นด้วย (ยืนยันจากภาพ
+    // จริงที่ผู้ใช้ส่งมา ว่างเปล่าทั้งจอ) เพราะ decode ผ่าน engine's image codec
+    // เป็นการ round-trip แบบ async จริง ไม่ใช่แค่ resolve microtask เฉยๆ ในบาง
+    // สภาพแวดล้อม (เช่น golden test ที่ pump จำนวนเฟรมคงที่ ไม่ใช้
+    // pumpAndSettle()) อาจไม่เสร็จทันเวลาที่ pump ไว้ -- ให้พื้น/ป้ายร้าน/ตัว
+    // ละคร (แสดง placeholder ว่างจนกว่าจะโหลดเสร็จ) ถูกสร้างทันทีแทน ไม่ผูกกับ
+    // การโหลดภาพเลย ดู PlayerComponent.onLoad() สำหรับที่ที่ decode เกิดขึ้นจริง
     final mapHeight = _mapHeight(vendors.length);
     _worldHeight = mapHeight;
     final cellWidth = size.x / _columns;
@@ -108,7 +107,7 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
       add(stall);
     }
 
-    player = PlayerComponent(sheet: characterSheet)..position = Vector2(size.x / 2, _topPadding);
+    player = PlayerComponent(assetPath: characterAssetPath)..position = Vector2(size.x / 2, _topPadding);
     add(player);
 
     // แผนที่สูงกว่าจอได้เมื่อร้านค้าเยอะ (mapHeight ขึ้นกับจำนวนร้าน) ให้กล้อง
@@ -171,21 +170,23 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
 
 /// ตัวละครของผู้เล่น วาดจาก sprite sheet จริงเดียวกับเวอร์ชัน widget (ดู
 /// CharacterSprite/market_map_screen.dart) หันทิศทางตามที่เดิน (แถวในตาราง)
-/// พร้อมไล่เฟรมเดิน (คอลัมน์) ระหว่างเคลื่อนที่ — รับภาพที่ decode เสร็จแล้ว
-/// เข้ามาตรงๆ จาก MarketFlameGame.onLoad() (ไม่ decode เองใน onLoad() ของ
-/// component นี้ เพราะรอบแรกที่ทำแบบนั้นพบว่า golden test ถ่ายภาพก่อนโหลด
-/// เสร็จ ตัวละครเลยไม่ขึ้นเลย -- ดูคอมเมนต์ใน MarketFlameGame.onLoad()) แล้ว
-/// render ด้วย canvas.drawImageRect ตรงๆ แทนการซ้อน
-/// CircleComponent/RectangleComponent หลายชิ้น ลดความเสี่ยงจาก API ที่ไม่เคย
-/// ยืนยันในเวอร์ชัน Flame ที่ resolve จริง (render(Canvas) เป็น core API ของ
-/// Component ที่เสถียรมาก ทุก shape component ที่ใช้อยู่แล้วในไฟล์นี้ก็
-/// implement มันแบบเดียวกันนี้อยู่แล้วภายใน)
+/// พร้อมไล่เฟรมเดิน (คอลัมน์) ระหว่างเคลื่อนที่ — โหลด+decode ภาพเองใน
+/// onLoad() ของ component นี้ (ไม่ผูกกับ onLoad() ของ MarketFlameGame ทั้งก้อน
+/// -- เคยลอง await ไว้ที่นั่นแล้วพบว่า GameWidget ทั้งหน้าค้างที่ loading
+/// เปล่าๆ จนกว่า decode จะเสร็จ ดูคอมเมนต์ใน MarketFlameGame.onLoad()) ระหว่าง
+/// รอ sheet โหลดเสร็จ render() จะข้ามการวาดไปก่อน (โปร่งใส ไม่ error) แล้วขึ้น
+/// เองทันทีที่โหลดเสร็จเพราะ game loop วาดใหม่ทุกเฟรมอยู่แล้ว วาดด้วย
+/// canvas.drawImageRect ตรงๆ แทนการซ้อน CircleComponent/RectangleComponent
+/// หลายชิ้น ลดความเสี่ยงจาก API ที่ไม่เคยยืนยันในเวอร์ชัน Flame ที่ resolve
+/// จริง (render(Canvas) เป็น core API ของ Component ที่เสถียรมาก ทุก shape
+/// component ที่ใช้อยู่แล้วในไฟล์นี้ก็ implement มันแบบเดียวกันนี้อยู่แล้วภายใน)
 class PlayerComponent extends PositionComponent {
-  final Image sheet;
+  final String assetPath;
 
-  PlayerComponent({required this.sheet})
+  PlayerComponent({required this.assetPath})
       : super(size: Vector2.all(_playerDisplaySize), anchor: Anchor.center);
 
+  Image? _sheet;
   _Direction _facing = _Direction.down;
   int _walkFrame = 0;
   // Timer จาก dart:async ต้อง alias เพราะ package:flame/components.dart
@@ -195,8 +196,19 @@ class PlayerComponent extends PositionComponent {
   async_lib.Timer? _walkTimer;
 
   @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    final data = await rootBundle.load(assetPath);
+    final codec = await instantiateImageCodec(data.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    _sheet = frame.image;
+  }
+
+  @override
   void render(Canvas canvas) {
     super.render(canvas);
+    final sheet = _sheet;
+    if (sheet == null) return; // ยังโหลดภาพไม่เสร็จ ข้ามเฟรมนี้ไปก่อน
     final src = Rect.fromLTWH(
       _walkFrame * _frameSize,
       _facing.spriteRow * _frameSize,
