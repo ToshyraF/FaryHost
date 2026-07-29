@@ -12,7 +12,12 @@ import 'vendor_menu_screen.dart';
 const _columns = 2;
 const _cellHeight = 180.0;
 const _stallSize = 72.0;
-const _avatarSize = 44.0;
+const _avatarWidth = 40.0;
+const _avatarHeight = 56.0;
+// ระยะขอบสำหรับกันตัวละครเดินชนขอบแผนที่ (ดู _moveAvatarTo) — ตัวเลขเดิม
+// ก่อนเปลี่ยนจากอวตารสี่เหลี่ยมจัตุรัสมาเป็นร่างคนยืน ไม่เกี่ยวกับสัดส่วน
+// ร่างกายจริง แค่กันไว้ให้มีระยะขอบเท่าเดิม
+const _avatarClampMargin = 44.0;
 const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
@@ -66,8 +71,8 @@ class _MarketMapScreenState extends State<MarketMapScreen> {
   void _moveAvatarTo(Offset target, double mapWidth, double mapHeight) {
     setState(() {
       _avatarPosition = Offset(
-        target.dx.clamp(_avatarSize, mapWidth - _avatarSize),
-        target.dy.clamp(_avatarSize, mapHeight - _avatarSize),
+        target.dx.clamp(_avatarClampMargin, mapWidth - _avatarClampMargin),
+        target.dy.clamp(_avatarClampMargin, mapHeight - _avatarClampMargin),
       );
     });
   }
@@ -189,8 +194,8 @@ class _MarketMapScreenState extends State<MarketMapScreen> {
                   AnimatedPositioned(
                     duration: const Duration(milliseconds: 350),
                     curve: Curves.easeOut,
-                    left: _avatarPosition.dx - _avatarSize / 2,
-                    top: _avatarPosition.dy - _avatarSize / 2,
+                    left: _avatarPosition.dx - _avatarWidth / 2,
+                    top: _avatarPosition.dy - _avatarHeight / 2,
                     child: const _Avatar(),
                   ),
                 ],
@@ -222,81 +227,157 @@ class _MarketGroundPainter extends CustomPainter {
   bool shouldRepaint(covariant _MarketGroundPainter oldDelegate) => false;
 }
 
-/// ตัวละครของผู้เล่น (ลูกค้า) ออกแบบให้น่ารักสไตล์ชิบิ/kawaii เหมาะกับกลุ่ม
-/// วัยรุ่น — หัวกลมไล่สีชมพู-ม่วงพาสเทล ตากลมโตมีประกาย แก้มแดง และปากยิ้ม
-/// เล็กๆ แทนวงกลมสีทึบพร้อมไอคอนคนเดิน ประกอบจาก widget ล้วนๆ ไม่ใช้ภาพ/asset
-///
-/// ใช้ Positioned ที่ระบุ left/top/width/height ครบทุกค่า (คำนวณเป็นพิกเซล
-/// ตรงๆ จากสัดส่วนของ _avatarSize) แทน Align+alignment fraction — จากที่
-/// golden screenshot รอบแรกออกมาผิดรูป (ไม่ใช่วงกลม) sandbox นี้ไม่มี Flutter
-/// SDK ให้รันเทียบเองได้ เลยเปลี่ยนมาใช้ Positioned แบบระบุค่าครบเพื่อตัด
-/// ความไม่แน่นอนของพฤติกรรม Align ภายใน Stack ที่ตรวจสอบจริงไม่ได้ในนี้ออกไป
+/// ตัวละครของผู้เล่น (ลูกค้า) ออกแบบเป็นคนยืน/เดินสไตล์ชิบิ/kawaii เหมาะกับ
+/// กลุ่มวัยรุ่น — หัว + ลำตัว + แขน + ขาสองข้างที่ก้าวไม่เท่ากันให้ดูเหมือน
+/// กำลังเดิน แทนวงกลมหน้าเดียวหรือไอคอนคนเดินแบบเดิม ประกอบจาก widget ล้วนๆ
+/// ไม่ใช้ภาพ/asset — ทุกชิ้นส่วนวางด้วย Positioned ที่ระบุ
+/// left/top/width/height ครบทุกค่า (คำนวณเป็นพิกเซลตรงๆ จากสัดส่วนของ
+/// _avatarWidth/_avatarHeight) ไม่ใช้ Align เพราะรอบก่อนหน้าที่ใช้ Align ทำให้
+/// golden screenshot ออกมาผิดรูป (sandbox นี้ไม่มี Flutter SDK ให้รันเทียบเอง
+/// ได้ ตรวจพบผ่านการดู CI artifact เท่านั้น)
 class _Avatar extends StatelessWidget {
   const _Avatar();
 
   static const _faceColor = Color(0xFF6B4A6B);
   static const _blushColor = Color(0xFFFF8FB1);
-  static const _eyeSize = _avatarSize * 0.18;
+  static const _skinGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFFFB6E6), Color(0xFFB6A8FF)],
+  );
+  static const _armColor = Color(0xFFFFB6E6);
+  static const _headSize = 28.0;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: _avatarSize,
-      height: _avatarSize,
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFFB6E6), Color(0xFFB6A8FF)],
+      width: _avatarWidth,
+      height: _avatarHeight,
+      child: Stack(
+        children: [
+          // ขาซ้าย (ก้าวหน้า สัมผัสพื้น)
+          Positioned(
+            left: 11,
+            top: 42,
+            width: 8,
+            height: 14,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: _faceColor, borderRadius: BorderRadius.circular(4)),
+            ),
           ),
-          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))],
-        ),
-        child: Stack(
-          children: [
-            // แก้มซ้าย
-            Positioned(
-              left: _avatarSize * 0.172,
-              top: _avatarSize * 0.614,
-              width: _avatarSize * 0.14,
-              height: _avatarSize * 0.09,
-              child: const _Blush(),
+          // ขาขวา (ก้าวถอยหลัง/ยกขึ้นเล็กน้อย สั้นกว่า)
+          Positioned(
+            left: 21,
+            top: 40,
+            width: 8,
+            height: 12,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: _faceColor, borderRadius: BorderRadius.circular(4)),
             ),
-            // แก้มขวา
-            Positioned(
-              left: _avatarSize * 0.688,
-              top: _avatarSize * 0.614,
-              width: _avatarSize * 0.14,
-              height: _avatarSize * 0.09,
-              child: const _Blush(),
+          ),
+          // แขนซ้าย
+          Positioned(
+            left: 2,
+            top: 29,
+            width: 8,
+            height: 14,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: _armColor, borderRadius: BorderRadius.circular(4)),
             ),
-            // แถวตาทั้งสองข้าง (กว้างรวม = 2 ตา + ช่องว่างตรงกลาง)
-            Positioned(
-              left: _avatarSize * 0.125,
-              top: _avatarSize * 0.3485,
-              width: _avatarSize * 0.5,
-              height: _eyeSize,
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [_Eye(), _Eye()],
+          ),
+          // แขนขวา
+          Positioned(
+            left: 30,
+            top: 29,
+            width: 8,
+            height: 14,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: _armColor, borderRadius: BorderRadius.circular(4)),
+            ),
+          ),
+          // ลำตัว
+          Positioned(
+            left: 9,
+            top: 26,
+            width: 22,
+            height: 18,
+            child: const DecoratedBox(
+              decoration: BoxDecoration(gradient: _skinGradient, borderRadius: BorderRadius.all(Radius.circular(7))),
+            ),
+          ),
+          // หัว (มีหน้าคิ้วตาแก้มปากอยู่ข้างใน)
+          Positioned(
+            left: (_avatarWidth - _headSize) / 2,
+            top: 0,
+            width: _headSize,
+            height: _headSize,
+            child: const _Head(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// หัวของตัวละคร: วงกลมไล่สีชมพู-ม่วงพาสเทล + ตากลมโตมีประกาย + แก้มแดง +
+/// ปากยิ้มเล็กๆ — สัดส่วนเดิมจาก _Avatar ตอนยังเป็นแค่หัวลอย เปลี่ยนฐานคำนวณ
+/// จาก _avatarSize (ทั้งตัว) มาเป็น _headSize (แค่หัว) แทน
+class _Head extends StatelessWidget {
+  const _Head();
+
+  static const _eyeSize = _Avatar._headSize * 0.18;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: _Avatar._skinGradient,
+        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))],
+      ),
+      child: Stack(
+        children: [
+          // แก้มซ้าย
+          Positioned(
+            left: _Avatar._headSize * 0.172,
+            top: _Avatar._headSize * 0.614,
+            width: _Avatar._headSize * 0.14,
+            height: _Avatar._headSize * 0.09,
+            child: const _Blush(),
+          ),
+          // แก้มขวา
+          Positioned(
+            left: _Avatar._headSize * 0.688,
+            top: _Avatar._headSize * 0.614,
+            width: _Avatar._headSize * 0.14,
+            height: _Avatar._headSize * 0.09,
+            child: const _Blush(),
+          ),
+          // แถวตาทั้งสองข้าง (กว้างรวม = 2 ตา + ช่องว่างตรงกลาง)
+          Positioned(
+            left: _Avatar._headSize * 0.125,
+            top: _Avatar._headSize * 0.3485,
+            width: _Avatar._headSize * 0.5,
+            height: _eyeSize,
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [_Eye(), _Eye()],
+            ),
+          ),
+          // ปาก
+          Positioned(
+            left: _Avatar._headSize * 0.195,
+            top: _Avatar._headSize * 0.705,
+            width: _Avatar._headSize * 0.22,
+            height: _Avatar._headSize * 0.09,
+            child: Container(
+              decoration: BoxDecoration(
+                color: _Avatar._faceColor,
+                borderRadius: BorderRadius.circular(_Avatar._headSize * 0.05),
               ),
             ),
-            // ปาก
-            Positioned(
-              left: _avatarSize * 0.195,
-              top: _avatarSize * 0.705,
-              width: _avatarSize * 0.22,
-              height: _avatarSize * 0.09,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _faceColor,
-                  borderRadius: BorderRadius.circular(_avatarSize * 0.05),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -306,27 +387,28 @@ class _Avatar extends StatelessWidget {
 class _Eye extends StatelessWidget {
   const _Eye();
 
-  static const _pupilSize = _avatarSize * 0.1;
-  static const _highlightSize = _avatarSize * 0.04;
+  static const _headSize = _Avatar._headSize;
+  static const _pupilSize = _headSize * 0.1;
+  static const _highlightSize = _headSize * 0.04;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: _avatarSize * 0.18,
-      height: _avatarSize * 0.18,
+      width: _headSize * 0.18,
+      height: _headSize * 0.18,
       decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
       child: Stack(
         children: [
           Positioned(
-            left: _avatarSize * 0.04,
-            top: _avatarSize * 0.04,
+            left: _headSize * 0.04,
+            top: _headSize * 0.04,
             width: _pupilSize,
             height: _pupilSize,
             child: const _Pupil(),
           ),
           Positioned(
-            left: _avatarSize * 0.049,
-            top: _avatarSize * 0.042,
+            left: _headSize * 0.049,
+            top: _headSize * 0.042,
             width: _highlightSize,
             height: _highlightSize,
             child: const DecoratedBox(
@@ -359,7 +441,7 @@ class _Blush extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: _Avatar._blushColor.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(_avatarSize * 0.05),
+        borderRadius: BorderRadius.circular(_Avatar._headSize * 0.05),
       ),
     );
   }

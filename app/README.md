@@ -69,19 +69,23 @@ that's never been run — see "Status") wasn't worth the risk for what a
 `CustomPainter` can already do for the default experience.
 
 The avatar (`_Avatar` in `market_map_screen.dart`) is a cute chibi/kawaii
-face aimed at a teen audience — pastel pink-to-purple gradient head, big
-sparkly eyes, blush, small smile — instead of a plain colored circle, built
-entirely from nested `Container`/`DecoratedBox`/`Stack` widgets (no image
-assets, same constraint as above). Face parts are positioned with
-`Positioned` giving all four of `left`/`top`/`width`/`height` explicitly
-(hand-computed pixel offsets from `_avatarSize`), not `Align` — an earlier
-version used `Align` with fractional alignment inside the `Stack`, which
-rendered as a distorted, non-circular shape in the actual `flutter test`
-golden render (only caught by reading the CI artifact, since this sandbox
-has no Flutter SDK to render it directly). `Positioned` with every value
-given is unambiguous regardless of that; `Align`'s "expand to fill loose
-constraints, then place child by fraction" behavior turned out not to work
-the way it was reasoned about here.
+person aimed at a teen audience — a round head (pastel pink-to-purple
+gradient, big sparkly eyes, blush, small smile) on top of a small body with
+stub arms and two legs stepping unevenly (one longer/lower than the other)
+to read as mid-stride, instead of a single floating face or a plain
+walking-person icon. Built entirely from nested `Container`/`DecoratedBox`/
+`Stack` widgets (no image assets, same constraint as above); the head's
+face is its own `_Head` widget reusing the same proportions the face had
+when the avatar was head-only. Every part is positioned with `Positioned`
+giving all four of `left`/`top`/`width`/`height` explicitly (hand-computed
+pixel offsets from `_avatarWidth`/`_avatarHeight`/`_headSize`), not `Align`
+— an earlier version used `Align` with fractional alignment inside the
+`Stack`, which rendered as a distorted, non-circular shape in the actual
+`flutter test` golden render (only caught by reading the CI artifact, since
+this sandbox has no Flutter SDK to render it directly). `Positioned` with
+every value given is unambiguous regardless of that; `Align`'s "expand to
+fill loose constraints, then place child by fraction" behavior turned out
+not to work the way it was reasoned about here.
 
 ### Experimental: Flame version
 
@@ -111,11 +115,13 @@ Same proximity auto-open as the widget version: each `StallComponent` has a
 walking close opens that stall's menu once per approach; tapping a stall
 directly sets `wasNear = true` immediately so the walk-in animation landing
 on the stall doesn't also fire the proximity trigger right after.
-`PlayerComponent` gets the same chibi/kawaii face as the widget version's
-`_Avatar` (pastel body, eyes, blush), built from nested `CircleComponent`s
-the same proven way `StallComponent` already composites its own circles and
-text — no gradient/shader on this side, to avoid adding another
-never-locally-verified Flame API surface on top of what's already there.
+`PlayerComponent` gets the same chibi/kawaii full-body look as the widget
+version's `_Avatar` — head with face, body, arms, two unevenly-stepping
+legs — built from `RectangleComponent`s (body/arms/legs) and nested
+`CircleComponent`s (head/eyes/blush) the same proven way `StallComponent`
+already composites its own circles and text — no gradient/shader on this
+side, to avoid adding another never-locally-verified Flame API surface on
+top of what's already there.
 
 ## Payment
 

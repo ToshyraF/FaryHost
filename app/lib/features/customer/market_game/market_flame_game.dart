@@ -11,7 +11,10 @@ import '../../../core/models/vendor.dart';
 const _columns = 2;
 const _cellHeight = 180.0;
 const _stallSize = 72.0;
-const _playerSize = 44.0;
+const _playerWidth = 40.0;
+const _playerHeight = 56.0;
+const _headSize = 28.0;
+const _headOffset = (_playerWidth - _headSize) / 2;
 const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
@@ -138,38 +141,82 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   }
 }
 
-/// ตัวละครของผู้เล่น ออกแบบให้น่ารักสไตล์ชิบิ/kawaii เหมือน _Avatar ใน
-/// เวอร์ชัน widget — ตัวกลมสีพาสเทล ตากลมมีประกาย แก้มแดง แทนวงกลมสีทึบ
-/// เรียบๆ พร้อม effect เดินแบบ animate ไปยังจุดที่แตะ ประกอบจาก CircleComponent
-/// ซ้อนกันหลายชั้น (แบบเดียวกับที่ StallComponent ใช้อยู่แล้วและ build ผ่าน
-/// บน CI มาแล้ว) ไม่ใช้ gradient/shader เพื่อลดความเสี่ยงจาก API ที่ไม่เคย
-/// ยืนยันในเวอร์ชัน Flame ที่ resolve จริง
+/// ตัวละครของผู้เล่น ออกแบบเป็นคนยืน/เดินสไตล์ชิบิ/kawaii เหมือน _Avatar ใน
+/// เวอร์ชัน widget — หัว (มีตากลมมีประกาย แก้มแดง) + ลำตัว + แขน + ขาสองข้าง
+/// ที่ก้าวไม่เท่ากัน แทนวงกลมหน้าเดียวแบบเดิม ประกอบจาก RectangleComponent
+/// (ลำตัว/แขน/ขา) + CircleComponent ซ้อนกันหลายชั้น (หัว/หน้า — แบบเดียวกับที่
+/// StallComponent ใช้อยู่แล้วและ build ผ่านบน CI มาแล้ว) พร้อม effect เดิน
+/// แบบ animate ไปยังจุดที่แตะ ไม่ใช้ gradient/shader เพื่อลดความเสี่ยงจาก API
+/// ที่ไม่เคยยืนยันในเวอร์ชัน Flame ที่ resolve จริง
 class PlayerComponent extends PositionComponent {
-  PlayerComponent() : super(size: Vector2.all(_playerSize), anchor: Anchor.center);
+  PlayerComponent() : super(size: Vector2(_playerWidth, _playerHeight), anchor: Anchor.center);
 
   static const _bodyColor = Color(0xFFD9B3FF);
+  static const _armColor = Color(0xFFFFB6E6);
   static const _faceColor = Color(0xFF6B4A6B);
   static const _blushColor = Color(0xFFFF8FB1);
 
   @override
   Future<void> onLoad() async {
+    // ขาซ้าย (ก้าวหน้า สัมผัสพื้น)
+    add(
+      RectangleComponent(
+        position: Vector2(11, 42),
+        size: Vector2(8, 14),
+        paint: Paint()..color = _faceColor,
+      ),
+    );
+    // ขาขวา (ก้าวถอยหลัง/ยกขึ้นเล็กน้อย สั้นกว่า)
+    add(
+      RectangleComponent(
+        position: Vector2(21, 40),
+        size: Vector2(8, 12),
+        paint: Paint()..color = _faceColor,
+      ),
+    );
+    // แขนซ้าย/ขวา
+    add(
+      RectangleComponent(
+        position: Vector2(2, 29),
+        size: Vector2(8, 14),
+        paint: Paint()..color = _armColor,
+      ),
+    );
+    add(
+      RectangleComponent(
+        position: Vector2(_playerWidth - 10, 29),
+        size: Vector2(8, 14),
+        paint: Paint()..color = _armColor,
+      ),
+    );
+    // ลำตัว
+    add(
+      RectangleComponent(
+        position: Vector2(9, 26),
+        size: Vector2(22, 18),
+        paint: Paint()..color = _bodyColor,
+      ),
+    );
+    // หัว
     add(
       CircleComponent(
-        radius: _playerSize / 2,
+        radius: _headSize / 2,
+        anchor: Anchor.center,
+        position: Vector2(_headOffset + _headSize / 2, _headSize / 2),
         paint: Paint()..color = _bodyColor,
       ),
     );
 
-    for (final dx in [-_playerSize * 0.18, _playerSize * 0.18]) {
-      addAll(_eyeParts(Vector2(_playerSize / 2 + dx, _playerSize * 0.42)));
+    for (final dx in [-_headSize * 0.18, _headSize * 0.18]) {
+      addAll(_eyeParts(Vector2(_headOffset + _headSize / 2 + dx, _headSize * 0.42)));
     }
 
-    for (final dx in [-_playerSize * 0.24, _playerSize * 0.24]) {
+    for (final dx in [-_headSize * 0.24, _headSize * 0.24]) {
       add(
         CircleComponent(
-          radius: _playerSize * 0.09,
+          radius: _headSize * 0.09,
           anchor: Anchor.center,
-          position: Vector2(_playerSize / 2 + dx, _playerSize * 0.66),
+          position: Vector2(_headOffset + _headSize / 2 + dx, _headSize * 0.66),
           paint: Paint()..color = _blushColor.withOpacity(0.7),
         ),
       );
@@ -179,21 +226,21 @@ class PlayerComponent extends PositionComponent {
   List<Component> _eyeParts(Vector2 center) {
     return [
       CircleComponent(
-        radius: _playerSize * 0.09,
+        radius: _headSize * 0.09,
         anchor: Anchor.center,
         position: center,
         paint: Paint()..color = Colors.white,
       ),
       CircleComponent(
-        radius: _playerSize * 0.05,
+        radius: _headSize * 0.05,
         anchor: Anchor.center,
         position: center,
         paint: Paint()..color = _faceColor,
       ),
       CircleComponent(
-        radius: _playerSize * 0.02,
+        radius: _headSize * 0.02,
         anchor: Anchor.center,
-        position: Vector2(center.x - _playerSize * 0.02, center.y - _playerSize * 0.02),
+        position: Vector2(center.x - _headSize * 0.02, center.y - _headSize * 0.02),
         paint: Paint()..color = Colors.white,
       ),
     ];
