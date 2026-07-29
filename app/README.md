@@ -68,10 +68,12 @@ assets, and adding an untested new package (on top of everything else
 that's never been run — see "Status") wasn't worth the risk for what a
 `CustomPainter` can already do for the default experience.
 
-The avatar (`_Avatar` in `market_map_screen.dart`) is a small pixel-art RPG
-sprite (red cap, face, blue jacket, dark pants, black shoes) in the style of
-classic top-down Pokémon-like overworld characters, per a reference
-screenshot the user shared. It's drawn entirely by `_PixelSpritePainter`, a
+The avatar (`_Avatar` in `market_map_screen.dart`) is a small pixel-art
+"chibi portrait" — big head, spiky two-tone hair, big eyes with a
+highlight, bold black outline, small collar hint at the bottom — in the
+style of a reference sheet of chibi character portraits the user shared (an
+original design inspired by that style, not a copy of any specific
+character in it). It's drawn entirely by `_PixelSpritePainter`, a
 `CustomPainter` that fills one small `Rect` per character in the
 `_spriteRows` string grid (each row a line of the sprite, each character a
 palette key into `_spriteColors`, `.` meaning transparent) — no image
@@ -80,10 +82,12 @@ pixel grid sidesteps needing to fetch a real sprite sheet. The grid/palette
 were designed and checked by rendering the same grid as an HTML `<canvas>`
 and screenshotting it with the pre-installed headless Chromium before ever
 touching the Dart code — the same verification technique used to catch and
-fix the previous shape-based avatar's `Align` bug (kept only as
-`_avatarWidth`/`_avatarHeight`, now derived from the grid's own dimensions
-via `_spriteRows.first.length`/`_spriteRows.length` rather than hardcoded,
-so the on-screen size can never drift out of sync with the grid).
+fix the previous shape-based avatar's `Align` bug, and used again here to
+fix the first draft's hair spikes floating disconnected from the head
+before landing on the current grid (kept only as `_avatarWidth`/
+`_avatarHeight`, derived from the grid's own dimensions via
+`_spriteRows.first.length`/`_spriteRows.length` rather than hardcoded, so
+the on-screen size can never drift out of sync with the grid).
 
 ### Experimental: Flame version
 

@@ -19,42 +19,46 @@ const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
 
-// ตัวละครพิกเซลอาร์ตสไตล์เกม RPG แบบ Pokémon (ตามที่ผู้ใช้ส่งภาพตัวอย่างมา)
-// แทนตัวละครทรงชิบิ/kawaii แบบวงกลม+สี่เหลี่ยมมนแบบเดิม — วาดทีละ "พิกเซล"
-// (บล็อกสี่เหลี่ยมเล็กๆ) ตามตาราง _spriteRows ด้านล่าง ไม่ใช้ภาพ/asset จริง
-// เพราะ sandbox นี้ไม่มี network ให้ดาวน์โหลดภาพ (เหมือนเหตุผลเดิมทุกจุดใน
-// ไฟล์นี้) — ออกแบบ/ตรวจสอบภาพก่อนโดยจำลองเป็น HTML canvas แล้วถ่ายภาพดูด้วย
-// headless Chromium ที่ติดตั้งไว้ในเครื่องนี้ ก่อนย้ายมาเขียนเป็น Dart จริง
+// ตัวละครพิกเซลอาร์ตสไตล์ "chibi portrait" (หัวโต ผมทรงแหลมสองโทน ตาโตมีประกาย
+// เส้นขอบดำหนา) ตามภาพตัวอย่างชุดตัวละครที่ผู้ใช้ส่งมา แทนสไปรต์ RPG
+// แบบเดินเต็มตัวรอบก่อนหน้า — วาดทีละ "พิกเซล" (บล็อกสี่เหลี่ยมเล็กๆ) ตาม
+// ตาราง _spriteRows ด้านล่าง ไม่ใช้ภาพ/asset จริง เพราะ sandbox นี้ไม่มี
+// network ให้ดาวน์โหลดภาพ (เหมือนเหตุผลเดิมทุกจุดในไฟล์นี้) — ออกแบบตัว
+// ละครต้นแบบเอง (ไม่ได้ก็อปปี้ตัวละครใดตัวหนึ่งจากภาพตัวอย่างตรงๆ) แล้ว
+// ตรวจสอบภาพก่อนโดยจำลองเป็น HTML canvas แล้วถ่ายภาพดูด้วย headless
+// Chromium ที่ติดตั้งไว้ในเครื่องนี้ ก่อนย้ายมาเขียนเป็น Dart จริง
 const _spritePixel = 3.0;
 const _spriteRows = <String>[
-  '..............',
-  '....rrrrrr....',
-  '...rrrrrrrr...',
-  '..rrrrrrrrrr..',
-  '..kkkkkkkkkk..',
-  '..ffffffffff..',
-  '..ff.ee.ee.ff.',
-  '..ffffffffff..',
-  '..ffffffffff..',
-  '...ffffffff...',
-  '....wwwwww....',
-  '...jjjjjjjj...',
-  '..jjjjjjjjjj..',
-  '..jjjjjjjjjj..',
-  '..jj.jjjj.jj..',
-  '..oo.pppp.oo..',
-  '..oo.pppp.oo..',
-  '....oo..oo....',
+  '.....O....O...O.....',
+  '....OhO..OhO.OhO....',
+  '..OOOOOOOOOOOOOOOO..',
+  '.OhhhhhhhhhhhhhhhhO.',
+  '.OhhhhLLhhLLhhhhhhO.',
+  '.OhhhhhhhhhhhhhhhhO.',
+  '..OOOOOOOOOOOOOOOO..',
+  '.OhOFFFFFFFFFFFFOhO.',
+  '.OhOFFFEeFFeEFFFOhO.',
+  '.OFFFFFFFFFFFFFFFFO.',
+  '.OFFFFFFFFFFFFFFFFO.',
+  '...OFFFFFmmmmFFFFO..',
+  '....OFFFFFFFFFFO....',
+  '......OOOOOOOO......',
+  '......OCCCCCCO......',
+  '.....OCcCCcCO.......',
+  '....OCCCCCCCCCCO....',
+  '....OCCCC..CCCCO....',
+  '.....O........O.....',
 ];
 const _spriteColors = <String, Color>{
-  'r': Color(0xFFD64545), // หมวกแดง
-  'k': Color(0xFFA03232), // เงาขอบหมวก
-  'f': Color(0xFFFFD9A8), // ผิวหน้า
-  'e': Color(0xFF2B2118), // ตา
-  'w': Color(0xFFFFFFFF), // ปกเสื้อขาว
-  'j': Color(0xFF3E7BD1), // เสื้อแจ็คเก็ตฟ้า
-  'p': Color(0xFF2B2B45), // กางเกง
-  'o': Color(0xFF1A1A1A), // รองเท้า/เส้นขอบ
+  'O': Color(0xFF141414), // เส้นขอบดำหนา
+  'h': Color(0xFF2E5AA8), // ผมโทนกลาง
+  'L': Color(0xFF6FA8F5), // ผมไฮไลต์
+  'F': Color(0xFFFFE0C2), // ผิวหน้า
+  'E': Color(0xFF1B1B1B), // ตา
+  'e': Color(0xFFFFFFFF), // ประกายตา
+  'm': Color(0xFF7A3B2E), // ปาก
+  'C': Color(0xFFF2A93C), // เสื้อคอปก
+  'c': Color(0xFFC97F1E), // เงาเสื้อ
 };
 // ขนาดจริงของตัวละครบนจอ คำนวณจากขนาดตาราง (แถว/คอลัมน์) คูณ _spritePixel —
 // เป็น final ไม่ใช่ const เพราะ .length ไม่ใช่ compile-time constant expression
@@ -266,11 +270,10 @@ class _MarketGroundPainter extends CustomPainter {
   bool shouldRepaint(covariant _MarketGroundPainter oldDelegate) => false;
 }
 
-/// ตัวละครของผู้เล่น (ลูกค้า) วาดเป็นพิกเซลอาร์ตสไตล์เกม RPG แบบ Pokémon
-/// (หมวกแดง หน้า เสื้อแจ็คเก็ตฟ้า กางเกงเข้ม รองเท้าดำ) ตามภาพตัวอย่างที่
-/// ผู้ใช้ส่งมา แทนตัวละครทรงชิบิ/kawaii แบบวงกลม+สี่เหลี่ยมมนรอบก่อนหน้า —
-/// วาดด้วย CustomPaint ทีละบล็อกตามตาราง _spriteRows (ดูด้านบนของไฟล์)
-/// ไม่ใช้ภาพ/asset จริง
+/// ตัวละครของผู้เล่น (ลูกค้า) วาดเป็นพิกเซลอาร์ต "chibi portrait" (หัวโต
+/// ผมแหลมสองโทน ตาโตมีประกาย เส้นขอบดำหนา) ตามภาพตัวอย่างที่ผู้ใช้ส่งมา
+/// แทนสไปรต์ RPG แบบเดินเต็มตัวรอบก่อนหน้า — วาดด้วย CustomPaint ทีละ
+/// บล็อกตามตาราง _spriteRows (ดูด้านบนของไฟล์) ไม่ใช้ภาพ/asset จริง
 class _Avatar extends StatelessWidget {
   const _Avatar();
 

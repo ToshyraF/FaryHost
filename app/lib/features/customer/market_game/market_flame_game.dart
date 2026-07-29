@@ -15,40 +15,42 @@ const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
 
-// ตัวละครพิกเซลอาร์ตสไตล์เกม RPG แบบ Pokémon เดียวกับเวอร์ชัน widget (ดู
+// ตัวละครพิกเซลอาร์ต "chibi portrait" เดียวกับเวอร์ชัน widget (ดู
 // _Avatar/_PixelSpritePainter ใน market_map_screen.dart) — คัดลอกตาราง/พาเลต
 // สีมาตรงๆ แทนการ import ข้ามไฟล์ เพื่อให้เวอร์ชันทดลองนี้ยังแยกอิสระจาก
 // เวอร์ชัน widget เหมือนเดิม (จะได้ลบทิ้งได้ง่ายถ้าการทดลอง Flame ไม่ไปต่อ)
 const _spritePixel = 3.0;
 const _spriteRows = <String>[
-  '..............',
-  '....rrrrrr....',
-  '...rrrrrrrr...',
-  '..rrrrrrrrrr..',
-  '..kkkkkkkkkk..',
-  '..ffffffffff..',
-  '..ff.ee.ee.ff.',
-  '..ffffffffff..',
-  '..ffffffffff..',
-  '...ffffffff...',
-  '....wwwwww....',
-  '...jjjjjjjj...',
-  '..jjjjjjjjjj..',
-  '..jjjjjjjjjj..',
-  '..jj.jjjj.jj..',
-  '..oo.pppp.oo..',
-  '..oo.pppp.oo..',
-  '....oo..oo....',
+  '.....O....O...O.....',
+  '....OhO..OhO.OhO....',
+  '..OOOOOOOOOOOOOOOO..',
+  '.OhhhhhhhhhhhhhhhhO.',
+  '.OhhhhLLhhLLhhhhhhO.',
+  '.OhhhhhhhhhhhhhhhhO.',
+  '..OOOOOOOOOOOOOOOO..',
+  '.OhOFFFFFFFFFFFFOhO.',
+  '.OhOFFFEeFFeEFFFOhO.',
+  '.OFFFFFFFFFFFFFFFFO.',
+  '.OFFFFFFFFFFFFFFFFO.',
+  '...OFFFFFmmmmFFFFO..',
+  '....OFFFFFFFFFFO....',
+  '......OOOOOOOO......',
+  '......OCCCCCCO......',
+  '.....OCcCCcCO.......',
+  '....OCCCCCCCCCCO....',
+  '....OCCCC..CCCCO....',
+  '.....O........O.....',
 ];
 const _spriteColors = <String, Color>{
-  'r': Color(0xFFD64545),
-  'k': Color(0xFFA03232),
-  'f': Color(0xFFFFD9A8),
-  'e': Color(0xFF2B2118),
-  'w': Color(0xFFFFFFFF),
-  'j': Color(0xFF3E7BD1),
-  'p': Color(0xFF2B2B45),
-  'o': Color(0xFF1A1A1A),
+  'O': Color(0xFF141414),
+  'h': Color(0xFF2E5AA8),
+  'L': Color(0xFF6FA8F5),
+  'F': Color(0xFFFFE0C2),
+  'E': Color(0xFF1B1B1B),
+  'e': Color(0xFFFFFFFF),
+  'm': Color(0xFF7A3B2E),
+  'C': Color(0xFFF2A93C),
+  'c': Color(0xFFC97F1E),
 };
 // เป็น final ไม่ใช่ const เพราะ .length ไม่ใช่ compile-time constant expression
 final _playerWidth = _spriteRows.first.length * _spritePixel;
@@ -176,9 +178,9 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   }
 }
 
-/// ตัวละครของผู้เล่น วาดเป็นพิกเซลอาร์ตสไตล์เกม RPG แบบ Pokémon เดียวกับ
-/// เวอร์ชัน widget (ดู _Avatar/_PixelSpritePainter ใน market_map_screen.dart)
-/// แทนตัวละครทรงชิบิ/kawaii แบบวงกลม+สี่เหลี่ยมมนรอบก่อนหน้า — override
+/// ตัวละครของผู้เล่น วาดเป็นพิกเซลอาร์ต "chibi portrait" เดียวกับเวอร์ชัน
+/// widget (ดู _Avatar/_PixelSpritePainter ใน market_map_screen.dart) แทน
+/// สไปรต์ RPG แบบเดินเต็มตัวรอบก่อนหน้า — override
 /// render() วาด Canvas.drawRect ทีละบล็อกตามตาราง _spriteRows โดยตรง แทนการ
 /// ซ้อน CircleComponent/RectangleComponent หลายชิ้น ลดความเสี่ยงจาก API ที่
 /// ไม่เคยยืนยันในเวอร์ชัน Flame ที่ resolve จริง (render(Canvas) เป็น core
