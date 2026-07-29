@@ -4,6 +4,7 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
+import 'package:flame/geometry.dart';
 import 'package:flutter/material.dart' show Colors, Curves, TextStyle;
 
 import '../../../core/models/vendor.dart';
@@ -70,11 +71,21 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
 
     player = PlayerComponent()..position = Vector2(size.x / 2, _topPadding);
     add(player);
+
+    // แผนที่สูงกว่าจอได้เมื่อร้านค้าเยอะ (mapHeight ขึ้นกับจำนวนร้าน) ให้กล้อง
+    // เลื่อนตามตัวละครในแนวตั้ง (verticalOnly: true เพราะแนวนอนแคบพอดีจอเสมอ
+    // อยู่แล้ว จาก _columns คงที่) และ setBounds กันไม่ให้กล้องเลื่อนเกินขอบ
+    // แผนที่จนเห็นพื้นที่ว่างเปล่านอกแผนที่
+    camera.setBounds(Rectangle.fromLTWH(0, 0, size.x, mapHeight));
+    camera.follow(player, verticalOnly: true);
   }
 
   @override
   void onTapUp(TapUpEvent event) {
-    player.walkTo(event.localPosition);
+    // onTapUp นี้อยู่บน game root (นอก world/camera transform) event.localPosition
+    // จึงเป็นพิกัดจอ ไม่ใช่พิกัดแผนที่ — ต้องแปลงผ่านกล้องก่อน ไม่งั้นตอนกล้อง
+    // เลื่อน (หลังเพิ่ม camera.follow) ตัวละครจะเดินไปผิดตำแหน่ง
+    player.walkTo(camera.globalToLocal(event.canvasPosition));
   }
 
   Vector2 _stallPosition(int index, double cellWidth) {
