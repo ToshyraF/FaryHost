@@ -118,15 +118,25 @@ class _MarketMapScreenState extends State<MarketMapScreen> {
   // ไล่เฟรมเดิน (คอลัมน์ 0-3 ของ sprite sheet) ทุก 90ms ระหว่างที่ตัวละครกำลัง
   // เคลื่อนที่ (350ms เท่ากับ duration ของ AnimatedPositioned ที่ใช้เลื่อน
   // ตำแหน่งจริง) แล้วกลับไปเฟรม 0 (ยืนนิ่ง) เมื่อถึงปลายทาง
+  //
+  // เทียบ timer ที่สร้างในรอบนี้ (ตัวแปร local `timer`) กับ _walkTimer ก่อน
+  // cancel/reset ทุกครั้ง -- ถ้าแตะจุดใหม่ซ้อนกันถี่กว่า 350ms (ปกติมากตอน
+  // เดินสำรวจตลาด) _walkTimer จะถูกแทนที่ด้วย timer ของรอบใหม่ไปแล้ว แต่
+  // Future.delayed ของรอบเก่ายังค้างอยู่ ถ้าไปยึด _walkTimer ตรงๆ (ไม่เทียบ
+  // ก่อน) มันจะ cancel timer ของรอบใหม่ทิ้งและรีเซ็ตเฟรมเป็น 0 ทันที ทำให้
+  // แอนิเมชันเดินหยุด/ค้างเฟรมยืนนิ่งกลางคันขณะตัวละครยังเลื่อนตำแหน่งอยู่ --
+  // เดิมเป็นบั๊กนี้มาก่อน (เดินแล้วแอนิเมชันหายกลางคัน ไม่เสถียร)
   void _startWalkAnimation() {
     _walkTimer?.cancel();
     var frame = 0;
-    _walkTimer = Timer.periodic(const Duration(milliseconds: 90), (_) {
+    final timer = Timer.periodic(const Duration(milliseconds: 90), (_) {
       frame = (frame + 1) % 4;
       setState(() => _walkFrame = frame);
     });
+    _walkTimer = timer;
     Future.delayed(const Duration(milliseconds: 350), () {
-      _walkTimer?.cancel();
+      if (_walkTimer != timer) return;
+      timer.cancel();
       if (mounted) setState(() => _walkFrame = 0);
     });
   }

@@ -230,14 +230,21 @@ class PlayerComponent extends PositionComponent {
     add(MoveToEffect(target, EffectController(duration: 0.35, curve: Curves.easeOut)));
   }
 
+  // เทียบ timer ที่สร้างในรอบนี้กับ _walkTimer ก่อน cancel/reset เสมอ --
+  // เหมือนกับเวอร์ชัน widget (ดู market_map_screen.dart) ถ้าแตะจุดใหม่ถี่กว่า
+  // 350ms (ปกติมากตอนเดินสำรวจ) Future.delayed ของรอบเก่าจะยังค้างอยู่และไป
+  // cancel timer ของรอบใหม่ผิดตัวถ้าไม่เทียบก่อน ทำให้แอนิเมชันเดินค้างเฟรม
+  // ยืนนิ่งกลางคัน
   void _startWalkAnimation() {
     _walkTimer?.cancel();
     _walkFrame = 0;
-    _walkTimer = async_lib.Timer.periodic(const Duration(milliseconds: 90), (_) {
+    final timer = async_lib.Timer.periodic(const Duration(milliseconds: 90), (_) {
       _walkFrame = (_walkFrame + 1) % 4;
     });
+    _walkTimer = timer;
     async_lib.Future.delayed(const Duration(milliseconds: 350), () {
-      _walkTimer?.cancel();
+      if (_walkTimer != timer) return;
+      timer.cancel();
       _walkFrame = 0;
     });
   }

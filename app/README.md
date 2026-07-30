@@ -107,6 +107,21 @@ did, driven by a `Timer.periodic` (90ms per frame, 350ms total) started
 each time `_moveAvatarTo` sees real movement — only the rendering
 technique changed, not the movement/direction logic.
 
+`_startWalkAnimation` had a race: tapping a new destination before the
+previous walk's 350ms `Future.delayed` fired replaced `_walkTimer` with the
+new animation's timer, but that stale delayed callback still ran and called
+`_walkTimer?.cancel()` — which by then pointed at the *new* timer, killing
+it early and snapping `_walkFrame` back to 0 (standing) while the avatar
+was still sliding to its destination. Since tapping around repeatedly is
+the normal way to explore the map, this fired constantly and looked like
+the walk animation randomly freezing/disappearing mid-stride (reported by
+the user as "เดินหาย...ไม่เสถียรเลย"). Fixed by capturing the timer created
+in each call in a local variable and comparing it against `_walkTimer`
+before acting, so a superseded delayed callback becomes a no-op instead of
+cancelling the timer that replaced it. The Flame version's
+`PlayerComponent._startWalkAnimation` (below) had the exact same bug and
+got the same fix.
+
 ### Experimental: Flame version
 
 `lib/features/customer/market_game/` is the same map re-implemented on top
