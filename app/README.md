@@ -102,25 +102,52 @@ pattern as `AuthState`'s session persistence; `CharacterSelectScreen`
 (reachable from `MarketMapScreen`'s app bar) is a tap-to-pick grid of all
 10 down-facing idle frames. `_MarketMapScreenState` tracks `_facing`
 (down/left/right/up, mapped straight to sheet rows) and `_walkFrame`
-(0-3, mapped to sheet columns) the same way the previous hand-drawn avatar
-did, driven by a `Timer.periodic` (90ms per frame, 350ms total) started
-each time `_moveAvatarTo` sees real movement — only the rendering
-technique changed, not the movement/direction logic.
+(0-3, mapped to sheet columns), same as before — only how movement itself
+is driven has changed since, described next.
 
-`_startWalkAnimation` had a race: tapping a new destination before the
-previous walk's 350ms `Future.delayed` fired replaced `_walkTimer` with the
-new animation's timer, but that stale delayed callback still ran and called
-`_walkTimer?.cancel()` — which by then pointed at the *new* timer, killing
-it early and snapping `_walkFrame` back to 0 (standing) while the avatar
-was still sliding to its destination. Since tapping around repeatedly is
-the normal way to explore the map, this fired constantly and looked like
-the walk animation randomly freezing/disappearing mid-stride (reported by
-the user as "เดินหาย...ไม่เสถียรเลย"). Fixed by capturing the timer created
-in each call in a local variable and comparing it against `_walkTimer`
-before acting, so a superseded delayed callback becomes a no-op instead of
-cancelling the timer that replaced it. The Flame version's
-`PlayerComponent._startWalkAnimation` (below) had the exact same bug and
-got the same fix.
+Movement used to be continuous: tapping anywhere slid the avatar straight
+to that point over a fixed 350ms `AnimatedPositioned`, with a separate
+`Timer.periodic` cycling `_walkFrame` for the same 350ms window
+(`_startWalkAnimation`). That had a real race — tapping a new destination
+before the previous walk's window elapsed replaced the timer field with
+the new animation's timer, but a stale `Future.delayed` from the *old* call
+still fired and cancelled whatever timer the field pointed to by then (the
+new one), snapping `_walkFrame` back to 0 (standing) while the avatar was
+still sliding. Since tapping repeatedly is the normal way to explore a
+market, this fired constantly and looked like the walk animation randomly
+freezing mid-stride (reported by the user as "เดินหาย...ไม่เสถียรเลย").
+
+Two more requests followed directly from playing with it: keep the avatar
+from ever sliding off the visible screen on maps taller than the viewport,
+and make movement feel like an old handheld game — discrete steps you can
+also drive with directional buttons, not just a tap-to-anywhere slide.
+Both landed together as one redesign, since fixing the off-screen problem
+properly (a following camera) works best once movement is already
+grid-quantized. `_stepInDirection` is now the single place that moves the
+avatar: every call advances exactly `_stepSize` (32px) in one of the four
+cardinal directions, flips `_walkFrame` by one frame, and calls
+`_followAvatarWithCamera` — which keeps `_scrollController`'s offset
+centered on the avatar (clamped to `[0, mapHeight - viewportHeight]`) the
+same way a 2D platformer's camera follows the player, so the avatar can
+never walk somewhere the scroll view hasn't already scrolled to. This
+also fully retires the old timer race above: frame advancement now happens
+directly inside the one method that changes position, with no second timer
+racing to reset it.
+
+Two ways feed `_stepInDirection` a stream of steps, and starting either one
+always cancels the other (`_moveTimer`/`_activeDpadDirection`/
+`_pendingPath` are the single shared source of truth for whichever is
+active): holding one of the four `_Dpad` buttons (bottom-left corner
+overlay, plain `Container`+`Icon` circles, not an image) fires one
+immediate step then repeats every `_stepDuration` (160ms) until released;
+tapping the ground or a stall instead calls `_buildPath`, which turns the
+straight-line distance to the target into a queue of cardinal-direction
+steps (greedily stepping whichever axis has more remaining distance each
+turn, so the path looks like a staircase rather than one axis fully done
+before the other) and `_consumeNextPathStep` drains that queue on the same
+`_stepDuration` cadence. Tapping a stall directly (`_openVendor`) still
+opens its menu immediately, same as before — only the avatar's walk toward
+it is now stepped instead of an instant slide.
 
 ### Experimental: Flame version
 
@@ -145,6 +172,36 @@ version CI resolves) in `market_flame_game.dart`, so a map taller than the
 viewport (more vendors than fit on screen at once) scrolls as the player
 walks toward the bottom rows instead of clipping — no horizontal follow
 since the grid's fixed column count always fits the screen width exactly.
+The camera clamp above only ever kept the *camera* on the map, though —
+the player's own position was never clamped at all, so `player.walkTo()`
+would happily move it to any tapped point, including ones outside the
+world bounds entirely (the user's "ไม่อยากให้เดินหลุดหน้าจอ" report). Fixed
+alongside the Game Boy-style step redesign below by adding the same
+`_avatarClampMargin` the widget version already had, applied every step in
+`MarketFlameGame._stepInDirection`.
+
+Movement was redesigned the same way as the widget version above (see that
+section for the full rationale — both landed together): grid-quantized
+steps of `_stepSize` (32px) every `_stepDuration` (160ms), drivable by
+holding one of the four D-pad buttons overlaid on the `GameWidget` (plain
+`Container`+`Icon` circles, positioned via a `Stack` in
+`market_map_game_screen.dart`, same visual style as the widget version's)
+or by tapping the ground/a stall. Unlike the widget version, all of this
+orchestration (`_buildPath`, `_moveTimer`, `_activeDpadDirection`,
+`_pendingPath`, `beginDpadMovement`/`endDpadMovement`) lives on
+`MarketFlameGame` rather than `PlayerComponent` — components can't easily
+reach back to their parent game for the world bounds needed to clamp each
+step, so the game (which already owns `size`/`_worldHeight`) drives
+movement and calls `player.stepTo(target, direction)` once per step;
+`PlayerComponent` stays a dumb renderer that only knows how to take the one
+step it's told to. `MapDirection` (the direction enum) had to become a
+public type for this split, since the D-pad buttons live in a different
+file (`market_map_game_screen.dart`) from the enum's original private
+declaration. The proximity auto-open logic below needed no changes at all
+for any of this — it already re-checks distance every `update()` tick
+regardless of *how* `player.position` changes, so it works identically
+whether the avatar moves in continuous slides or discrete steps.
+
 Same proximity auto-open as the widget version: each `StallComponent` has a
 `wasNear` flag, checked every `update()` tick against `_nearRadius`, so
 walking close opens that stall's menu once per approach; tapping a stall
@@ -189,9 +246,10 @@ picked by `_facing`'s row and `_walkFrame`'s column) instead of the
 per-pixel `canvas.drawRect` calls the old hand-drawn version used —
 `render(Canvas)` is still the same core hook every built-in Flame shape
 component implements internally, so this stays low-exposure to unverified
-Flame API surface. `walkTo()` computes a facing direction from the target
-vs. current position delta (mirroring `_moveAvatarTo`'s logic in the
-widget file) and drives the same 90ms/350ms `Timer.periodic` walk-cycle;
+Flame API surface. `stepTo()` (called once per step by
+`MarketFlameGame._stepInDirection`, see above) just sets `_facing` to the
+direction it was given and advances `_walkFrame` by one — no per-call timer
+of its own, unlike the old `walkTo()`/`_startWalkAnimation` this replaced;
 unlike the old hand-drawn avatar, "right" doesn't need a mirror transform
 since the sheet already has distinct left/right frames.
 
@@ -228,7 +286,11 @@ silently renders wrong). A fix was attempted in `flutter_test_config.dart`
 (loading `packages/flutter/fonts/MaterialIcons-Regular.otf` the same way
 as the Thai font) but that asset path doesn't exist in the Flutter SDK
 version CI resolves and hard-crashed every test instead, so it was
-reverted — this is still an open, known issue, not yet fixed.
+reverted — this is still an open, known issue, not yet fixed. The D-pad's
+four arrow icons (`Icons.keyboard_arrow_*`, added for the Game Boy-style
+step movement — see "Market map" above) have the exact same cosmetic
+problem for the same reason; no separate tracking needed, it's the same
+open issue.
 
 ## Golden tests
 

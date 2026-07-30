@@ -16,8 +16,19 @@ const _stallSize = 72.0;
 const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
+// ระยะขอบกันตัวละครเดินชนขอบแผนที่/หลุดจอ — เดียวกับเวอร์ชัน widget (ดู
+// market_map_screen.dart) เวอร์ชัน Flame เดิมไม่เคย clamp ตำแหน่งผู้เล่นเลย
+// (แค่กล้องที่ clamp เองใน update() ด้านล่าง) เลยเดินทะลุขอบแผนที่ไปได้จริง
+const _avatarClampMargin = 44.0;
 
 const _playerDisplaySize = 56.0;
+
+// เดินทีละ "ก้าว" ระยะคงที่แบบเกมเก่า (Game Boy) แทนการไถลไปตำแหน่งใดก็ได้
+// ต่อเนื่อง — เดียวกับเวอร์ชัน widget (ดู market_map_screen.dart) ทุกก้าว
+// (ไม่ว่าสั่งจาก D-pad หรือแตะพื้น/ร้านค้า) ขยับระยะเท่ากันนี้เสมอ
+const _stepSize = 32.0;
+const _stepDuration = Duration(milliseconds: 160);
+const _stepSeconds = 0.16; // เท่ากับ _stepDuration แต่เป็นหน่วยวินาทีให้ EffectController
 
 // sprite sheet ตาราง 4x4 เฟรม 32x32: แถว 0=ลง(หน้า), 1=ซ้าย, 2=ขวา, 3=ขึ้น
 // (หลัง), คอลัมน์ 0-3 คือ walk cycle — เดียวกับเวอร์ชัน widget (ดู
@@ -25,16 +36,18 @@ const _playerDisplaySize = 56.0;
 // assets/sprites/CREDITS.txt
 const _frameSize = 32.0;
 
-enum _Direction { down, left, right, up }
+// public เพราะต้องใช้ข้ามไฟล์ (D-pad ใน market_map_game_screen.dart เรียก
+// MarketFlameGame.beginDpadMovement/endDpadMovement ซึ่งรับ/ใช้ type นี้)
+enum MapDirection { down, left, right, up }
 
-extension on _Direction {
+extension on MapDirection {
   int get spriteRow => index;
 }
 
 /// เวอร์ชันทดลองของแผนที่ตลาด สร้างด้วย Flame (Flutter game engine) แทนการ
 /// วาดด้วย widget ล้วนๆ เหมือน MarketMapScreen ปกติ — โครงเดียวกัน (ตัวละคร
-/// เดินไปตามที่แตะ, แตะร้านค้าให้เดินไปหาแล้วเปิดเมนู) แต่ render ผ่าน
-/// game loop ของ Flame แทน widget tree ธรรมดา
+/// เดินไปตามที่แตะทีละก้าว หรือกด D-pad, แตะร้านค้าให้เดินไปหาแล้วเปิดเมนู)
+/// แต่ render ผ่าน game loop ของ Flame แทน widget tree ธรรมดา
 ///
 /// นี่คือของทดลองจริงๆ: ไม่เคย build/รันเลยเพราะ sandbox นี้ไม่มี network
 /// ให้ดึง flame จาก pub.dev มาใช้ได้ (เหมือนที่ MarketMapScreen ตัวปกติเลี่ยง
@@ -54,6 +67,12 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   late final PlayerComponent player;
   late final double _worldHeight;
   final List<StallComponent> _stalls = [];
+
+  // ตัวเดียวที่ขับเคลื่อนการเดินทั้งหมด (เหมือนเวอร์ชัน widget) — เริ่มเดิน
+  // แบบใดแบบหนึ่ง (D-pad ค้าง / คิวเดินไปจุดที่แตะ) จะ cancel อีกแบบทิ้งเสมอ
+  async_lib.Timer? _moveTimer;
+  MapDirection? _activeDpadDirection;
+  final List<MapDirection> _pendingPath = [];
 
   @override
   Color backgroundColor() => const Color(0xFFF3E5C8);
@@ -98,7 +117,7 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
         vendor: vendor,
         stallPosition: position,
         onTap: () {
-          player.walkTo(position);
+          _walkPathTo(position);
           stall.wasNear = true;
           onOpenVendor(vendor);
         },
@@ -119,6 +138,12 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   }
 
   @override
+  void onRemove() {
+    _moveTimer?.cancel();
+    super.onRemove();
+  }
+
+  @override
   void update(double dt) {
     super.update(dt);
     final halfHeight = size.y / 2;
@@ -134,6 +159,8 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
     // เดินเข้าใกล้ร้านไหน (ในระยะ _nearRadius) เปิดเมนูร้านนั้นให้เลย — trigger
     // ตอน "เพิ่งเข้ามาใกล้" ครั้งเดียว (wasNear เดิมเป็น false) ไม่ใช่ทุก frame
     // ที่ยังอยู่ในระยะ ไม่งั้นจะเปิดหน้าเมนูซ้อนกันรัวๆ ระหว่างที่ยืนอยู่ตรงนั้น
+    // ทำงานถูกต้องไม่ว่าตำแหน่งผู้เล่นจะขยับแบบทีละก้าวหรือต่อเนื่อง เพราะเช็ค
+    // ทุก frame อยู่แล้ว ไม่ขึ้นกับกลไกการเดิน
     for (final stall in _stalls) {
       final isNear = stall.position.distanceTo(player.position) < _nearRadius;
       if (isNear && !stall.wasNear) {
@@ -150,7 +177,101 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
     // onTapUp นี้อยู่บน game root (นอก world/camera transform) event.localPosition
     // จึงเป็นพิกัดจอ ไม่ใช่พิกัดแผนที่ — ต้องแปลงผ่านกล้องก่อน ไม่งั้นตอนกล้อง
     // เลื่อน (หลังเพิ่ม camera.follow) ตัวละครจะเดินไปผิดตำแหน่ง
-    player.walkTo(camera.globalToLocal(event.canvasPosition));
+    _walkPathTo(camera.globalToLocal(event.canvasPosition));
+  }
+
+  /// เริ่มเดินค้างทิศ [dir] ต่อเนื่องขณะกด D-pad ค้างไว้ (เรียกจาก
+  /// market_map_game_screen.dart) — ก้าวแรกทันทีให้รู้สึกตอบสนองทันที แล้วก้าว
+  /// ต่อไปทุก _stepDuration จนกว่าจะปล่อยนิ้ว (ดู endDpadMovement) การกด D-pad
+  /// จะยกเลิกคิวเดินไปยังจุดที่แตะไว้ก่อนหน้าเสมอ
+  void beginDpadMovement(MapDirection dir) {
+    _pendingPath.clear();
+    _activeDpadDirection = dir;
+    _stepInDirection(dir);
+    _moveTimer?.cancel();
+    _moveTimer = async_lib.Timer.periodic(_stepDuration, (timer) {
+      final active = _activeDpadDirection;
+      if (active == null) {
+        timer.cancel();
+        _moveTimer = null;
+        player.resetWalkFrame();
+        return;
+      }
+      _stepInDirection(active);
+    });
+  }
+
+  void endDpadMovement() {
+    _activeDpadDirection = null;
+  }
+
+  // เรียกทั้งตอนแตะพื้นที่ว่างและตอนแตะร้านค้าตรงๆ — สร้างคิวก้าวเดินไปยัง
+  // [rawTarget] แล้วเดินให้ทีละก้าวห่างกัน _stepDuration แทนการไถลไปจุดนั้นใน
+  // ทีเดียวแบบเดิม (เดิมไม่ clamp ขอบเขตเลย ทำให้เดินทะลุขอบแผนที่ได้)
+  void _walkPathTo(Vector2 rawTarget) {
+    final target = Vector2(
+      rawTarget.x.clamp(_avatarClampMargin, size.x - _avatarClampMargin),
+      rawTarget.y.clamp(_avatarClampMargin, _worldHeight - _avatarClampMargin),
+    );
+    _activeDpadDirection = null;
+    _moveTimer?.cancel();
+    _moveTimer = null;
+    _pendingPath
+      ..clear()
+      ..addAll(_buildPath(player.position, target));
+    if (_pendingPath.isEmpty) return;
+    _consumeNextPathStep();
+    if (_pendingPath.isEmpty) return; // ถึงตั้งแต่ก้าวแรก ไม่ต้องตั้ง timer ต่อ
+    _moveTimer = async_lib.Timer.periodic(_stepDuration, (timer) {
+      _consumeNextPathStep();
+      if (_pendingPath.isEmpty) {
+        timer.cancel();
+        _moveTimer = null;
+      }
+    });
+  }
+
+  void _consumeNextPathStep() {
+    if (_pendingPath.isEmpty) return;
+    final dir = _pendingPath.removeAt(0);
+    _stepInDirection(dir);
+    if (_pendingPath.isEmpty) player.resetWalkFrame();
+  }
+
+  // แปลงระยะทางจากตำแหน่งผู้เล่นปัจจุบันถึง [to] เป็นคิวก้าวเดิน 4 ทิศ (ไม่มี
+  // แนวทแยง เหมือนเกมเก่า) — แกนไหนเหลือระยะมากกว่าก้าวไปทางนั้นก่อนในแต่ละก้าว
+  // ทำให้เส้นทางดูเป็นขั้นบันไดแทนที่จะเดินแกนเดียวจนสุดแล้วค่อยเปลี่ยนแกน
+  List<MapDirection> _buildPath(Vector2 from, Vector2 to) {
+    var dx = ((to.x - from.x) / _stepSize).round();
+    var dy = ((to.y - from.y) / _stepSize).round();
+    final path = <MapDirection>[];
+    while (dx != 0 || dy != 0) {
+      if (dx.abs() >= dy.abs() && dx != 0) {
+        path.add(dx > 0 ? MapDirection.right : MapDirection.left);
+        dx += dx > 0 ? -1 : 1;
+      } else {
+        path.add(dy > 0 ? MapDirection.down : MapDirection.up);
+        dy += dy > 0 ? -1 : 1;
+      }
+    }
+    return path;
+  }
+
+  // ก้าวเดียวระยะ _stepSize ไปทาง [dir] clamp ไม่ให้เกินขอบแผนที่เสมอ (ดูหมาย
+  // เหตุ _avatarClampMargin ด้านบน — เวอร์ชันเดิมไม่เคย clamp ตรงนี้เลย)
+  void _stepInDirection(MapDirection dir) {
+    final vector = switch (dir) {
+      MapDirection.up => Vector2(0, -1),
+      MapDirection.down => Vector2(0, 1),
+      MapDirection.left => Vector2(-1, 0),
+      MapDirection.right => Vector2(1, 0),
+    };
+    final target = player.position + vector * _stepSize;
+    final clamped = Vector2(
+      target.x.clamp(_avatarClampMargin, size.x - _avatarClampMargin),
+      target.y.clamp(_avatarClampMargin, _worldHeight - _avatarClampMargin),
+    );
+    player.stepTo(clamped, dir);
   }
 
   Vector2 _stallPosition(int index, double cellWidth) {
@@ -170,7 +291,7 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
 
 /// ตัวละครของผู้เล่น วาดจาก sprite sheet จริงเดียวกับเวอร์ชัน widget (ดู
 /// CharacterSprite/market_map_screen.dart) หันทิศทางตามที่เดิน (แถวในตาราง)
-/// พร้อมไล่เฟรมเดิน (คอลัมน์) ระหว่างเคลื่อนที่ — โหลด+decode ภาพเองใน
+/// พร้อมไล่เฟรมเดิน (คอลัมน์) ทีละเฟรมต่อก้าว — โหลด+decode ภาพเองใน
 /// onLoad() ของ component นี้ (ไม่ผูกกับ onLoad() ของ MarketFlameGame ทั้งก้อน
 /// -- เคยลอง await ไว้ที่นั่นแล้วพบว่า GameWidget ทั้งหน้าค้างที่ loading
 /// เปล่าๆ จนกว่า decode จะเสร็จ ดูคอมเมนต์ใน MarketFlameGame.onLoad()) ระหว่าง
@@ -180,6 +301,11 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
 /// หลายชิ้น ลดความเสี่ยงจาก API ที่ไม่เคยยืนยันในเวอร์ชัน Flame ที่ resolve
 /// จริง (render(Canvas) เป็น core API ของ Component ที่เสถียรมาก ทุก shape
 /// component ที่ใช้อยู่แล้วในไฟล์นี้ก็ implement มันแบบเดียวกันนี้อยู่แล้วภายใน)
+///
+/// การเดินทั้งหมด (คิว/D-pad/จังหวะก้าว) ถูกขับเคลื่อนจาก MarketFlameGame ไม่ใช่
+/// component นี้ — component นี้แค่รับคำสั่ง "ก้าวเดียวไปจุดนี้" ผ่าน [stepTo]
+/// แล้วอัปเดตทิศ/เฟรม/เอฟเฟกต์เลื่อนของตัวเอง เหมือน widget เวอร์ชัน (state
+/// class คุมการเดิน, CharacterSprite แค่ render 1 เฟรม)
 class PlayerComponent extends PositionComponent {
   final String assetPath;
 
@@ -187,13 +313,8 @@ class PlayerComponent extends PositionComponent {
       : super(size: Vector2.all(_playerDisplaySize), anchor: Anchor.center);
 
   Image? _sheet;
-  _Direction _facing = _Direction.down;
+  MapDirection _facing = MapDirection.down;
   int _walkFrame = 0;
-  // Timer จาก dart:async ต้อง alias เพราะ package:flame/components.dart
-  // export คลาสชื่อ Timer ของตัวเองด้วย (flame/src/timer.dart) ซึ่งไม่มี
-  // .periodic()/.cancel() แบบเดียวกัน — ถ้าไม่ alias ชื่อ Timer เปล่าๆ จะ
-  // resolve ไปเป็นของ Flame แทน
-  async_lib.Timer? _walkTimer;
 
   @override
   Future<void> onLoad() async {
@@ -219,40 +340,17 @@ class PlayerComponent extends PositionComponent {
     canvas.drawImageRect(sheet, src, dst, Paint()..filterQuality = FilterQuality.none);
   }
 
-  void walkTo(Vector2 target) {
-    final delta = target - position;
-    if (delta.length > 1) {
-      _facing = delta.x.abs() > delta.y.abs()
-          ? (delta.x > 0 ? _Direction.right : _Direction.left)
-          : (delta.y > 0 ? _Direction.down : _Direction.up);
-      _startWalkAnimation();
-    }
-    add(MoveToEffect(target, EffectController(duration: 0.35, curve: Curves.easeOut)));
+  /// ก้าวเดียวไปยัง [target] (คำนวณ/clamp มาแล้วจาก MarketFlameGame) หันหน้า
+  /// ไปทาง [dir] และไล่เฟรมเดินไปอีก 1 เฟรม แล้วค่อยๆ เลื่อนไปด้วย MoveToEffect
+  /// ระยะเวลาเท่ากับ _stepDuration ให้ดูเป็นการก้าวจริง ไม่ใช่การสอนกระโดด
+  void stepTo(Vector2 target, MapDirection dir) {
+    _facing = dir;
+    _walkFrame = (_walkFrame + 1) % 4;
+    add(MoveToEffect(target, EffectController(duration: _stepSeconds, curve: Curves.easeOut)));
   }
 
-  // เทียบ timer ที่สร้างในรอบนี้กับ _walkTimer ก่อน cancel/reset เสมอ --
-  // เหมือนกับเวอร์ชัน widget (ดู market_map_screen.dart) ถ้าแตะจุดใหม่ถี่กว่า
-  // 350ms (ปกติมากตอนเดินสำรวจ) Future.delayed ของรอบเก่าจะยังค้างอยู่และไป
-  // cancel timer ของรอบใหม่ผิดตัวถ้าไม่เทียบก่อน ทำให้แอนิเมชันเดินค้างเฟรม
-  // ยืนนิ่งกลางคัน
-  void _startWalkAnimation() {
-    _walkTimer?.cancel();
+  void resetWalkFrame() {
     _walkFrame = 0;
-    final timer = async_lib.Timer.periodic(const Duration(milliseconds: 90), (_) {
-      _walkFrame = (_walkFrame + 1) % 4;
-    });
-    _walkTimer = timer;
-    async_lib.Future.delayed(const Duration(milliseconds: 350), () {
-      if (_walkTimer != timer) return;
-      timer.cancel();
-      _walkFrame = 0;
-    });
-  }
-
-  @override
-  void onRemove() {
-    _walkTimer?.cancel();
-    super.onRemove();
   }
 }
 
