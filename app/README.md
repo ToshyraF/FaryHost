@@ -45,28 +45,41 @@ script has not actually been run — see "Status" below.
 
 ## Market map
 
-`MarketMapScreen` is the customer home (`AuthGate` routes here, not straight
-to the plain list — that's still reachable via the app bar's "ดูแบบรายการ"
-button). Stalls are laid out in a fixed grid derived from their index in the
-vendor list (deterministic, not random, so the map looks the same on every
-load); tapping empty ground walks an avatar there via `AnimatedPositioned`,
-tapping a stall walks the avatar to it and opens that stall's menu, and a
-stall's marker scales up slightly and its border highlights when the avatar
-is within `_nearRadius`. Walking close enough to a stall (without tapping it
-directly) auto-opens that stall's menu too — `_maybeAutoOpenNearbyVendor`,
-called after every ground tap, edge-triggers on entering `_nearRadius` (once
-per approach, tracked via `_lastNearVendorId`, not every frame the avatar
-stays there) so standing near a stall doesn't repeatedly push the menu
-screen. Every stall still stays tappable regardless of avatar position too
-(no functional gate), since this is a real ordering app first.
+`MarketMapGameScreen` (`lib/features/customer/market_game/`) is the
+customer home (`AuthGate` routes here, not straight to the plain list —
+that's still reachable via the app bar's "ดูแบบรายการ" button), rendered
+with [Flame](https://flame-engine.org) (`MarketFlameGame` + `FlameGame`
+components for the ground, player, and stalls) rather than plain widgets.
 
-The map floor and everything on it is built from plain widgets — a
-`CustomPainter` for the ground, `Icon`/`Container`/`DecoratedBox` for the
-avatar and stall markers — rather than an illustrated background or a game
-engine. Two reasons: this sandbox has no network access to fetch any image
-assets, and adding an untested new package (on top of everything else
-that's never been run — see "Status") wasn't worth the risk for what a
-`CustomPainter` can already do for the default experience.
+This wasn't the first design. It started as a plain-widget screen
+(`MarketMapScreen`, since deleted) — a `CustomPainter` ground plus
+`Icon`/`Container`/`DecoratedBox` markers — because this sandbox had no
+network access to fetch image assets or verify an untested new package.
+Once a licensed sprite pack was uploaded directly by the user (not fetched
+from a URL, so that constraint no longer applied), Flame got a genuine,
+first-time try as an experimental alternative living alongside the widget
+version, reachable from that screen's app bar rather than replacing it —
+specifically so a broken Flame integration couldn't take down the
+customer's only way to order. After several rounds of CI fixes and
+user-uploaded golden screenshots confirmed it rendered correctly end to
+end (see "Bugs found only from a real screenshot" below), the user asked
+to keep only the game version, and the widget screen was deleted outright.
+`MarketMapGameScreen` is now the sole implementation, not a
+fallback-guarded experiment.
+
+Stalls are laid out in a fixed grid derived from their index in the vendor
+list (deterministic, not random, so the map looks the same on every load).
+Tapping empty ground walks the avatar there, tapping a stall walks to it
+and opens that stall's menu, and walking close enough to any stall without
+tapping it directly auto-opens its menu too — each `StallComponent` tracks
+its own `wasNear` flag, checked every `update()` tick against `_nearRadius`,
+edge-triggering once per approach rather than every frame in range
+(tapping a stall directly sets `wasNear = true` immediately so the walk-in
+landing on it doesn't also fire the proximity trigger right after). Every
+stall stays tappable regardless of avatar position (no functional gate),
+since this is a real ordering app first.
+
+### Sprite sheet and character selection
 
 The avatar is a real pixel-art sprite sheet, not hand-drawn — a hand-coded
 `CustomPainter` grid was the approach through several earlier redesigns
@@ -83,137 +96,101 @@ license text and provenance. Each sheet is a 128x128 grid of 4x4 frames
 up/back; columns 0-3 are a 4-frame walk cycle.
 
 `CharacterSprite` (`lib/features/customer/character_sprite.dart`) crops and
-scales one frame from a sheet — `Image.asset` loads the whole sheet, a
-`Stack` + `Positioned` with explicit `left`/`top`/`width`/`height` (all four
-values given directly) shifts the desired frame into view, and the outer
-`ClipRect` cuts off the rest; `FilterQuality.none` keeps the pixel edges
-crisp when scaled up. The first version used `OverflowBox` +
-`alignment: Alignment.topLeft` instead of `Positioned`, which rendered the
-avatar completely invisible in a real render (caught from a user-uploaded
-golden screenshot, not CI — `flutter test --update-goldens` only checks
-that *a* frame renders without throwing, not that it looks right) — the
-exact same class of bug as the earlier `Align`-in-`Stack` issue on the
-hand-drawn avatar, both fixed the same way: explicit `Positioned` with all
-four values, never a fractional `Align`/`OverflowBox` alignment for
-sprite/UI-part placement in this codebase.
-`CharacterState` (`lib/core/state/character_state.dart`) persists which of
-the 10 characters the customer picked via `shared_preferences`, the same
-pattern as `AuthState`'s session persistence; `CharacterSelectScreen`
-(reachable from `MarketMapScreen`'s app bar) is a tap-to-pick grid of all
-10 down-facing idle frames. `_MarketMapScreenState` tracks `_facing`
-(down/left/right/up, mapped straight to sheet rows) and `_walkFrame`
-(0-3, mapped to sheet columns), same as before — only how movement itself
-is driven has changed since, described next.
+scales one frame from a sheet for the character-picker grid — `Image.asset`
+loads the whole sheet, a `Stack` + `Positioned` with explicit
+`left`/`top`/`width`/`height` (all four values given directly) shifts the
+desired frame into view, and the outer `ClipRect` cuts off the rest;
+`FilterQuality.none` keeps the pixel edges crisp when scaled up. The first
+version used `OverflowBox` + `alignment: Alignment.topLeft` instead of
+`Positioned`, which rendered the avatar completely invisible in a real
+render (caught from a user-uploaded golden screenshot, not CI — `flutter
+test --update-goldens` only checks that *a* frame renders without
+throwing, not that it looks right) — the exact same class of bug as an
+earlier `Align`-in-`Stack` issue on the original hand-drawn avatar, both
+fixed the same way: explicit `Positioned` with all four values, never a
+fractional `Align`/`OverflowBox` alignment for sprite/UI-part placement in
+this codebase. `CharacterState` (`lib/core/state/character_state.dart`)
+persists which of the 10 characters the customer picked via
+`shared_preferences`, the same pattern as `AuthState`'s session
+persistence; `CharacterSelectScreen` (reachable from the map's app bar) is
+a tap-to-pick grid of all 10 down-facing idle frames. Flame's
+`PlayerComponent` draws from the same sprite sheets directly (see below),
+not through `CharacterSprite`.
 
-Movement used to be continuous: tapping anywhere slid the avatar straight
-to that point over a fixed 350ms `AnimatedPositioned`, with a separate
-`Timer.periodic` cycling `_walkFrame` for the same 350ms window
-(`_startWalkAnimation`). That had a real race — tapping a new destination
-before the previous walk's window elapsed replaced the timer field with
-the new animation's timer, but a stale `Future.delayed` from the *old* call
-still fired and cancelled whatever timer the field pointed to by then (the
-new one), snapping `_walkFrame` back to 0 (standing) while the avatar was
-still sliding. Since tapping repeatedly is the normal way to explore a
-market, this fired constantly and looked like the walk animation randomly
-freezing mid-stride (reported by the user as "เดินหาย...ไม่เสถียรเลย").
+### Game Boy-style step movement, camera-follow, and D-pad
+
+Movement used to be a free continuous slide: tapping anywhere moved the
+avatar straight to that point over a fixed-duration tween, with a separate
+timer cycling the walk-frame column for the same window. That had a real
+race — tapping a new destination before the previous walk's window elapsed
+replaced the timer field with the new animation's timer, but a stale
+delayed callback from the *old* call still fired and cancelled whatever
+the field pointed to by then (the new one), snapping the walk frame back
+to standing while the avatar was still sliding. Since tapping repeatedly
+is the normal way to explore a market, this fired constantly and looked
+like the walk animation randomly freezing mid-stride (reported by the
+user as "เดินหาย...ไม่เสถียรเลย").
 
 Two more requests followed directly from playing with it: keep the avatar
-from ever sliding off the visible screen on maps taller than the viewport,
-and make movement feel like an old handheld game — discrete steps you can
-also drive with directional buttons, not just a tap-to-anywhere slide.
-Both landed together as one redesign, since fixing the off-screen problem
-properly (a following camera) works best once movement is already
-grid-quantized. `_stepInDirection` is now the single place that moves the
-avatar: every call advances exactly `_stepSize` (32px) in one of the four
-cardinal directions, flips `_walkFrame` by one frame, and calls
-`_followAvatarWithCamera` — which keeps `_scrollController`'s offset
-centered on the avatar (clamped to `[0, mapHeight - viewportHeight]`) the
-same way a 2D platformer's camera follows the player, so the avatar can
-never walk somewhere the scroll view hasn't already scrolled to. This
-also fully retires the old timer race above: frame advancement now happens
-directly inside the one method that changes position, with no second timer
-racing to reset it.
+from ever sliding off the visible screen on maps taller than the viewport
+(the camera already followed the player — see below — but the player's
+*own* position was never clamped to the world bounds at all; `walkTo()`
+would happily move it to any tapped point, including ones outside the map
+entirely, which is what the user meant by "ไม่อยากให้เดินหลุดหน้าจอ"), and
+make movement feel like an old handheld game — discrete steps, also
+drivable with directional buttons, not just a tap-to-anywhere slide.
 
-Two ways feed `_stepInDirection` a stream of steps, and starting either one
-always cancels the other (`_moveTimer`/`_activeDpadDirection`/
-`_pendingPath` are the single shared source of truth for whichever is
-active): holding one of the four `_Dpad` buttons (bottom-left corner
-overlay, plain `Container`+`Icon` circles, not an image) fires one
-immediate step then repeats every `_stepDuration` (160ms) until released;
-tapping the ground or a stall instead calls `_buildPath`, which turns the
-straight-line distance to the target into a queue of cardinal-direction
-steps (greedily stepping whichever axis has more remaining distance each
-turn, so the path looks like a staircase rather than one axis fully done
-before the other) and `_consumeNextPathStep` drains that queue on the same
-`_stepDuration` cadence. Tapping a stall directly (`_openVendor`) still
-opens its menu immediately, same as before — only the avatar's walk toward
-it is now stepped instead of an instant slide.
+`MarketFlameGame._stepInDirection` is now the single method that ever
+moves the player: every call advances exactly `_stepSize` (32px) in one of
+the four cardinal directions, clamps the result to the world bounds
+(`_avatarClampMargin` — fixing the off-screen bug above), and calls
+`player.stepTo(target, direction)`, which just sets the facing direction
+and advances the walk frame by one — no per-call timer of its own, unlike
+the old `walkTo()`/per-move animation this replaced, which also fully
+retires the timer race described above. Two ways feed `_stepInDirection` a
+stream of steps, and starting either one always cancels the other
+(`_moveTimer`/`_activeDpadDirection`/`_pendingPath` are the single shared
+source of truth for whichever is active): holding one of the four `_Dpad`
+buttons (bottom-left corner overlay in `market_map_game_screen.dart`,
+plain `Container`+`Icon` circles, not an image) fires one immediate step
+then repeats every `_stepDuration` (160ms) until released; tapping the
+ground or a stall instead calls `_buildPath`, which turns the straight-line
+distance to the target into a queue of cardinal-direction steps (greedily
+stepping whichever axis has more remaining distance each turn, so the path
+looks like a staircase rather than one axis fully done before the other),
+and the game drains that queue on the same cadence. `MapDirection` (the
+direction enum) is a public type for this reason — the D-pad buttons live
+in a different file (`market_map_game_screen.dart`) from where the enum is
+declared (`market_flame_game.dart`).
 
-### Experimental: Flame version
+All of this movement orchestration lives on `MarketFlameGame` rather than
+on `PlayerComponent`, since a component can't easily reach back to its
+parent game for the world bounds needed to clamp each step — the game
+(which already owns `size`/`_worldHeight`) drives movement and
+`PlayerComponent` stays a dumb renderer that only knows how to take the
+one step it's told. The proximity auto-open logic above needed no changes
+at all for this redesign — it already re-checks distance every `update()`
+tick regardless of *how* `player.position` changes, so it works
+identically whether the avatar moves in continuous slides or discrete
+steps.
 
-`lib/features/customer/market_game/` is the same map re-implemented on top
-of [Flame](https://flame-engine.org) (`MarketFlameGame` + `FlameGame`
-components for the ground, player, and stalls), reachable from
-`MarketMapScreen`'s app bar ("ทดลองเวอร์ชันเกม") rather than replacing the
-default screen. This is a genuine, first-time experiment: `flame` is the
-first external package added to this app since the widget-only approach
-above was chosen specifically to avoid this risk, and — like everything
-else here — it has never been built, since this sandbox has no network
-access to `pub.dev` to fetch it or a Flutter SDK to compile it. Expect it
-to need a round or two of CI-driven fixes (see `.github/workflows/ci.yml`)
-before it actually renders correctly; that's the plan, not a sign
-something's wrong. It deliberately doesn't replace `MarketMapScreen` so the
-app keeps a working customer experience regardless of how that shakes out.
-The camera follows the player vertically and is clamped to the map's
-extent (`camera.follow(player, verticalOnly: true)` in `onLoad`, plus a
-manual clamp of `camera.viewfinder.position.y` in `update()` — not
+The camera itself follows the player vertically and is clamped to the
+map's extent (`camera.follow(player, verticalOnly: true)` in `onLoad`,
+plus a manual clamp of `camera.viewfinder.position.y` in `update()` — not
 `camera.setBounds`, whose bounds-shape API/import didn't match the Flame
 version CI resolves) in `market_flame_game.dart`, so a map taller than the
 viewport (more vendors than fit on screen at once) scrolls as the player
 walks toward the bottom rows instead of clipping — no horizontal follow
 since the grid's fixed column count always fits the screen width exactly.
-The camera clamp above only ever kept the *camera* on the map, though —
-the player's own position was never clamped at all, so `player.walkTo()`
-would happily move it to any tapped point, including ones outside the
-world bounds entirely (the user's "ไม่อยากให้เดินหลุดหน้าจอ" report). Fixed
-alongside the Game Boy-style step redesign below by adding the same
-`_avatarClampMargin` the widget version already had, applied every step in
-`MarketFlameGame._stepInDirection`.
 
-Movement was redesigned the same way as the widget version above (see that
-section for the full rationale — both landed together): grid-quantized
-steps of `_stepSize` (32px) every `_stepDuration` (160ms), drivable by
-holding one of the four D-pad buttons overlaid on the `GameWidget` (plain
-`Container`+`Icon` circles, positioned via a `Stack` in
-`market_map_game_screen.dart`, same visual style as the widget version's)
-or by tapping the ground/a stall. Unlike the widget version, all of this
-orchestration (`_buildPath`, `_moveTimer`, `_activeDpadDirection`,
-`_pendingPath`, `beginDpadMovement`/`endDpadMovement`) lives on
-`MarketFlameGame` rather than `PlayerComponent` — components can't easily
-reach back to their parent game for the world bounds needed to clamp each
-step, so the game (which already owns `size`/`_worldHeight`) drives
-movement and calls `player.stepTo(target, direction)` once per step;
-`PlayerComponent` stays a dumb renderer that only knows how to take the one
-step it's told to. `MapDirection` (the direction enum) had to become a
-public type for this split, since the D-pad buttons live in a different
-file (`market_map_game_screen.dart`) from the enum's original private
-declaration. The proximity auto-open logic below needed no changes at all
-for any of this — it already re-checks distance every `update()` tick
-regardless of *how* `player.position` changes, so it works identically
-whether the avatar moves in continuous slides or discrete steps.
+### Bugs found only from a real screenshot, not CI
 
-Same proximity auto-open as the widget version: each `StallComponent` has a
-`wasNear` flag, checked every `update()` tick against `_nearRadius`, so
-walking close opens that stall's menu once per approach; tapping a stall
-directly sets `wasNear = true` immediately so the walk-in animation landing
-on the stall doesn't also fire the proximity trigger right after.
-`PlayerComponent` uses the same licensed sprite sheet as the widget
-version's `CharacterSprite` (see "Market map" above for the source/license)
-rather than loading it through Flame's own `Images` asset cache — it reads
-the bytes itself via `rootBundle.load(assetPath)` + `instantiateImageCodec`
-in its own `onLoad()`, so it doesn't need to adopt Flame's asset-path-
-prefix convention just to reuse a path already declared in `pubspec.yaml`
-for the widget version. `render()` skips drawing (leaves the component
+`PlayerComponent` uses the same licensed sprite sheet as the character
+picker (see above) rather than loading it through Flame's own `Images`
+asset cache — it reads the bytes itself via `rootBundle.load(assetPath)` +
+`instantiateImageCodec` in its own `onLoad()`, so it doesn't need to adopt
+Flame's asset-path-prefix convention just to reuse a path already declared
+in `pubspec.yaml`. `render()` skips drawing (leaves the component
 transparent) while that decode is still in flight, then picks it up
 automatically once done since the game loop re-renders every frame anyway
 — this was deliberately kept non-blocking after a first attempt moved the
@@ -235,23 +212,16 @@ completed. The vendor name labels had a matching but separate bug —
 stall names rendered as empty boxes too (Flame text doesn't inherit the
 app's `ThemeData` the way a widget `Text` does); fixed by setting it
 explicitly, same as `flutter_test_config.dart` already does for the
-widget-tree side. None of these threw an exception, so
-`flutter test --update-goldens` reported them all as passing — only a real
-screenshot revealed the problems, which is why the CI-driven "expect it to
-need a fix or two" caveat above only covers compile/runtime errors, not
-silently-wrong (or silently-blank) renders. `render(Canvas canvas)` does a
-single
+widget-tree side. None of these threw an exception, so `flutter test
+--update-goldens` reported them all as passing — only a real screenshot
+revealed the problems, which is why CI green should only ever be read as
+"compiles and runs," never as "renders correctly," for anything visual in
+this app. `render(Canvas canvas)` does a single
 `canvas.drawImageRect(sheet, srcRect, dstRect, ...)` per frame (`srcRect`
-picked by `_facing`'s row and `_walkFrame`'s column) instead of the
-per-pixel `canvas.drawRect` calls the old hand-drawn version used —
-`render(Canvas)` is still the same core hook every built-in Flame shape
-component implements internally, so this stays low-exposure to unverified
-Flame API surface. `stepTo()` (called once per step by
-`MarketFlameGame._stepInDirection`, see above) just sets `_facing` to the
-direction it was given and advances `_walkFrame` by one — no per-call timer
-of its own, unlike the old `walkTo()`/`_startWalkAnimation` this replaced;
-unlike the old hand-drawn avatar, "right" doesn't need a mirror transform
-since the sheet already has distinct left/right frames.
+picked by the facing row and walk-frame column) — the same core hook
+every built-in Flame shape component implements internally, so this stays
+low-exposure to unverified Flame API surface; "right" doesn't need a
+mirror transform since the sheet already has distinct left/right frames.
 
 ## Payment
 
@@ -278,28 +248,26 @@ and `test_helpers.dart`'s `pumpGolden` uses the same `buildAppTheme()` as
 fonts at all unless the app explicitly loads one, so without this every
 golden screenshot would show blank boxes instead of the actual Thai text.
 
-The market map's stall markers (`Icons.storefront`) have the same
-problem — no `MaterialIcons` font loaded means they render as an empty
-tofu box in golden screenshots instead of the actual glyph, caught from a
-user-uploaded screenshot rather than CI (this doesn't throw, it just
-silently renders wrong). A fix was attempted in `flutter_test_config.dart`
+Any `Icon` widget has the same problem — no `MaterialIcons` font loaded
+means it renders as an empty tofu box in golden screenshots instead of the
+actual glyph. First caught on the now-deleted widget map's stall markers
+(`Icons.storefront`) from a user-uploaded screenshot rather than CI (this
+doesn't throw, it just silently renders wrong); the market map's current
+D-pad (`Icons.keyboard_arrow_*` — see "Market map" above) has the exact
+same cosmetic problem for the same reason, as does `WelcomeScreen`'s own
+`Icons.storefront`. A fix was attempted in `flutter_test_config.dart`
 (loading `packages/flutter/fonts/MaterialIcons-Regular.otf` the same way
 as the Thai font) but that asset path doesn't exist in the Flutter SDK
 version CI resolves and hard-crashed every test instead, so it was
-reverted — this is still an open, known issue, not yet fixed. The D-pad's
-four arrow icons (`Icons.keyboard_arrow_*`, added for the Game Boy-style
-step movement — see "Market map" above) have the exact same cosmetic
-problem for the same reason; no separate tracking needed, it's the same
-open issue.
+reverted — this is still an open, known issue, not yet fixed.
 
 ## Golden tests
 
 `test/golden/` has widget-level golden (screenshot) tests for the screens
 that render meaningfully without a live backend: welcome, login, register,
-cart (empty + with items), the market map (both the widget version and the
-experimental Flame version), the character select grid, the vendor list,
-order status (both the awaiting-payment QR view and the post-payment
-pickup-code view), and the vendor create-stall form. Screens that need data mock the network via
+cart (empty + with items), the market map, the character select grid, the
+vendor list, order status (both the awaiting-payment QR view and the
+post-payment pickup-code view), and the vendor create-stall form. Screens that need data mock the network via
 `package:http/testing.dart`'s `MockClient` (see
 `vendor_list_screen_test.dart`, `order_status_screen_test.dart`,
 `vendor_create_stall_screen_test.dart` for the pattern) — `test_helpers.dart`'s

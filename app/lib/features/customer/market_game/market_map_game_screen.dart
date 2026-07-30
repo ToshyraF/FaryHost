@@ -4,15 +4,24 @@ import 'package:provider/provider.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/models/vendor.dart';
+import '../../../core/state/auth_state.dart';
 import '../../../core/state/character_state.dart';
+import '../character_select_screen.dart';
+import '../order_history_screen.dart';
+import '../vendor_list_screen.dart';
 import '../vendor_menu_screen.dart';
 import 'market_flame_game.dart';
 
-/// เวอร์ชันทดลอง: หน้าเดียวกับ MarketMapScreen แต่ render ด้วย Flame แทน
-/// widget ธรรมดา ดู market_flame_game.dart สำหรับรายละเอียดว่าทดลองอะไรอยู่
-/// และทำไมยังไม่เคยรันจริง — เข้าถึงได้จาก MarketMapScreen's app bar
-/// (ปุ่ม "ทดลองเวอร์ชันเกม") ไม่ได้แทนที่หน้าเดิม เผื่อ Flame integration
-/// มีปัญหาที่ต้องแก้หลายรอบ ผู้ใช้ยังมีหน้าที่ใช้งานได้จริงอยู่เสมอ
+/// หน้าแรกของลูกค้าแบบ "เดินเล่นในตลาด" — เดินไปตามที่แตะหรือกด D-pad ทีละ
+/// ก้าว (ดู market_flame_game.dart), แตะร้านค้าให้เดินไปหาแล้วเปิดเมนูเลย
+/// render ด้วย [Flame](https://flame-engine.org) เดิมมีเวอร์ชัน widget ล้วนๆ
+/// (`MarketMapScreen`) เป็นหน้าหลักคู่กันไป และหน้านี้เป็นแค่ทางเลือกทดลองที่
+/// เข้าถึงจากปุ่มในแอปบาร์ของเวอร์ชันนั้น (กันความเสี่ยงตอน `flame` ยังไม่เคย
+/// ผ่านการ build จริงเลยในสภาพแวดล้อมที่เขียนโค้ดนี้ — sandbox บล็อกไม่ให้ดึง
+/// จาก pub.dev) แต่หลัง CI ยืนยันว่าใช้งานได้จริงและตรวจสอบด้วยรูป golden
+/// จริงหลายรอบ ผู้ใช้ขอให้เหลือแค่เวอร์ชันนี้เวอร์ชันเดียว จึงลบเวอร์ชัน
+/// widget ทิ้งทั้งไฟล์และย้ายปุ่มในแอปบาร์ (เลือกตัวละคร/ดูแบบรายการ/
+/// ประวัติการสั่ง/ออกจากระบบ) มาไว้ที่นี่แทน — ดู app/README.md's "Market map"
 class MarketMapGameScreen extends StatefulWidget {
   const MarketMapGameScreen({super.key});
 
@@ -36,7 +45,37 @@ class _MarketMapGameScreenState extends State<MarketMapGameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('เดินเล่นในตลาด (ทดลอง: Flame)')),
+      appBar: AppBar(
+        title: const Text('เดินเล่นในตลาด'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.face_retouching_natural),
+            tooltip: 'เลือกตัวละคร',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CharacterSelectScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.view_list),
+            tooltip: 'ดูแบบรายการ',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const VendorListScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.receipt_long),
+            tooltip: 'ประวัติการสั่ง',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const OrderHistoryScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'ออกจากระบบ',
+            onPressed: () => context.read<AuthState>().logout(),
+          ),
+        ],
+      ),
       body: FutureBuilder<List<Vendor>>(
         future: _vendorsFuture,
         builder: (context, snapshot) {
@@ -72,12 +111,11 @@ class _MarketMapGameScreenState extends State<MarketMapGameScreen> {
   }
 }
 
-/// ปุ่มบังคับทิศทางมุมจอซ้ายล่าง แบบ D-pad เกมพกพาเก่า — เดียวกับเวอร์ชัน
-/// widget (ดู market_map_screen.dart) แค่ยิงเข้า MarketFlameGame แทน setState
-/// ตรงๆ กดค้างเพื่อเดินต่อเนื่องทีละก้าว ปล่อยนิ้วเพื่อหยุด วาดด้วย widget
-/// ล้วนๆ (วงกลม 4 อัน + ไอคอนลูกศร) ไม่ใช่ภาพประกอบ เป็น widget ธรรมดาที่วาง
-/// ทับ GameWidget ผ่าน Stack ไม่ใช่ Flame component เอง เพราะ overlay
-/// UI/ปุ่มกดเป็นงานที่ widget ปกติของ Flutter ทำได้ตรงไปตรงมากว่า
+/// ปุ่มบังคับทิศทางมุมจอซ้ายล่าง แบบ D-pad เกมพกพาเก่า — กดค้างเพื่อเดิน
+/// ต่อเนื่องทีละก้าว ปล่อยนิ้วเพื่อหยุด วาดด้วย widget ล้วนๆ (วงกลม 4 อัน +
+/// ไอคอนลูกศร) ไม่ใช่ภาพประกอบ เป็น widget ธรรมดาที่วางทับ GameWidget ผ่าน
+/// Stack ไม่ใช่ Flame component เอง เพราะ overlay UI/ปุ่มกดเป็นงานที่ widget
+/// ปกติของ Flutter ทำได้ตรงไปตรงมากว่า
 class _Dpad extends StatelessWidget {
   final void Function(MapDirection direction) onDirectionDown;
   final VoidCallback onDirectionUp;

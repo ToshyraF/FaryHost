@@ -10,7 +10,7 @@ import 'package:faryhost_app/features/customer/market_game/market_map_game_scree
 import '../test_helpers.dart';
 
 void main() {
-  testWidgets('MarketMapGameScreen แสดงผล (ทดลอง Flame)', (tester) async {
+  testWidgets('MarketMapGameScreen แสดงผล', (tester) async {
     final client = ApiClient(
       client: MockClient((request) async {
         if (request.method == 'GET' && request.url.path.endsWith('/vendors')) {

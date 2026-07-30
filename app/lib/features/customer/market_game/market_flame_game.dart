@@ -16,23 +16,22 @@ const _stallSize = 72.0;
 const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
-// ระยะขอบกันตัวละครเดินชนขอบแผนที่/หลุดจอ — เดียวกับเวอร์ชัน widget (ดู
-// market_map_screen.dart) เวอร์ชัน Flame เดิมไม่เคย clamp ตำแหน่งผู้เล่นเลย
-// (แค่กล้องที่ clamp เองใน update() ด้านล่าง) เลยเดินทะลุขอบแผนที่ไปได้จริง
+// ระยะขอบกันตัวละครเดินชนขอบแผนที่/หลุดจอ — เวอร์ชันแรกของไฟล์นี้ไม่เคย
+// clamp ตำแหน่งผู้เล่นเลย (แค่กล้องที่ clamp เองใน update() ด้านล่าง) เลย
+// เดินทะลุขอบแผนที่ไปได้จริง แก้พร้อมกับการเปลี่ยนมาเดินทีละก้าวด้านล่าง
 const _avatarClampMargin = 44.0;
 
 const _playerDisplaySize = 56.0;
 
 // เดินทีละ "ก้าว" ระยะคงที่แบบเกมเก่า (Game Boy) แทนการไถลไปตำแหน่งใดก็ได้
-// ต่อเนื่อง — เดียวกับเวอร์ชัน widget (ดู market_map_screen.dart) ทุกก้าว
-// (ไม่ว่าสั่งจาก D-pad หรือแตะพื้น/ร้านค้า) ขยับระยะเท่ากันนี้เสมอ
+// ต่อเนื่องแบบเวอร์ชันแรก — ทุกก้าว (ไม่ว่าสั่งจาก D-pad หรือแตะพื้น/ร้านค้า)
+// ขยับระยะเท่ากันนี้เสมอ
 const _stepSize = 32.0;
 const _stepDuration = Duration(milliseconds: 160);
 const _stepSeconds = 0.16; // เท่ากับ _stepDuration แต่เป็นหน่วยวินาทีให้ EffectController
 
 // sprite sheet ตาราง 4x4 เฟรม 32x32: แถว 0=ลง(หน้า), 1=ซ้าย, 2=ขวา, 3=ขึ้น
-// (หลัง), คอลัมน์ 0-3 คือ walk cycle — เดียวกับเวอร์ชัน widget (ดู
-// market_map_screen.dart/character_sprite.dart) ที่มา/สิทธิ์การใช้งานอยู่ใน
+// (หลัง), คอลัมน์ 0-3 คือ walk cycle — ที่มา/สิทธิ์การใช้งานอยู่ใน
 // assets/sprites/CREDITS.txt
 const _frameSize = 32.0;
 
@@ -44,15 +43,17 @@ extension on MapDirection {
   int get spriteRow => index;
 }
 
-/// เวอร์ชันทดลองของแผนที่ตลาด สร้างด้วย Flame (Flutter game engine) แทนการ
-/// วาดด้วย widget ล้วนๆ เหมือน MarketMapScreen ปกติ — โครงเดียวกัน (ตัวละคร
-/// เดินไปตามที่แตะทีละก้าว หรือกด D-pad, แตะร้านค้าให้เดินไปหาแล้วเปิดเมนู)
-/// แต่ render ผ่าน game loop ของ Flame แทน widget tree ธรรมดา
+/// แผนที่ตลาดของหน้าลูกค้า สร้างด้วย Flame (Flutter game engine) — ตัวละคร
+/// เดินไปตามที่แตะทีละก้าว หรือกด D-pad, แตะร้านค้าให้เดินไปหาแล้วเปิดเมนูเลย
 ///
-/// นี่คือของทดลองจริงๆ: ไม่เคย build/รันเลยเพราะ sandbox นี้ไม่มี network
-/// ให้ดึง flame จาก pub.dev มาใช้ได้ (เหมือนที่ MarketMapScreen ตัวปกติเลี่ยง
-/// การพึ่ง external package มาโดยตลอด) ต้องรอ CI (ที่เข้าถึง pub.dev ได้จริง)
-/// ยืนยันว่า compile ผ่านและ API ที่ใช้ตรงกับเวอร์ชัน flame ที่ resolve ได้จริง
+/// เดิมมีเวอร์ชัน widget ล้วนๆ (`MarketMapScreen`, ลบทิ้งแล้ว) เป็นหน้าหลัก
+/// คู่กันไป โดยหน้านี้เป็นแค่ทางเลือกทดลองที่เข้าถึงจากปุ่มในแอปบาร์ของ
+/// เวอร์ชันนั้น — กันความเสี่ยงตอน `flame` (external package ตัวแรกที่แอปนี้
+/// เพิ่มเข้ามา) ยังไม่เคยผ่านการ build จริงเลยในสภาพแวดล้อมที่เขียนโค้ดนี้
+/// (sandbox บล็อกไม่ให้ดึงจาก pub.dev) แต่หลัง CI ยืนยันว่า compile ผ่านและ
+/// รูป golden จริงหลายรอบยืนยันว่าใช้งานได้ถูกต้อง ผู้ใช้ขอให้เหลือแค่
+/// เวอร์ชันนี้เวอร์ชันเดียว จึงเป็นหน้าแรกของลูกค้าโดยตรงแล้ว (ดู main.dart's
+/// AuthGate) ไม่ใช่ทางเลือกเสริมอีกต่อไป
 class MarketFlameGame extends FlameGame with TapCallbacks {
   final List<Vendor> vendors;
   final void Function(Vendor vendor) onOpenVendor;
@@ -289,8 +290,9 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   }
 }
 
-/// ตัวละครของผู้เล่น วาดจาก sprite sheet จริงเดียวกับเวอร์ชัน widget (ดู
-/// CharacterSprite/market_map_screen.dart) หันทิศทางตามที่เดิน (แถวในตาราง)
+/// ตัวละครของผู้เล่น วาดจาก sprite sheet จริงชุดเดียวกับที่หน้าเลือกตัวละคร
+/// (`CharacterSelectScreen`/`CharacterSprite`) ใช้แสดงตอนเลือก หันทิศทางตามที่
+/// เดิน (แถวในตาราง)
 /// พร้อมไล่เฟรมเดิน (คอลัมน์) ทีละเฟรมต่อก้าว — โหลด+decode ภาพเองใน
 /// onLoad() ของ component นี้ (ไม่ผูกกับ onLoad() ของ MarketFlameGame ทั้งก้อน
 /// -- เคยลอง await ไว้ที่นั่นแล้วพบว่า GameWidget ทั้งหน้าค้างที่ loading
