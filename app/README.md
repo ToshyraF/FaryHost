@@ -232,6 +232,25 @@ every built-in Flame shape component implements internally, so this stays
 low-exposure to unverified Flame API surface; "right" doesn't need a
 mirror transform since the sheet already has distinct left/right frames.
 
+A different class of bug — not visual, so no golden screenshot could ever
+have caught it — showed up only once the app was actually driven end to
+end: after a successful login or register, the screen just sat there
+instead of moving on. `LoginScreen`/`RegisterScreen` are pushed via
+`Navigator.of(context).push(MaterialPageRoute(...))` from `WelcomeScreen`
+(and `LoginScreen` can push `RegisterScreen` too, via its "ยังไม่มีบัญชี?
+สมัครสมาชิก" link), landing on top of the *same* root `Navigator` that
+holds `AuthGate` at the bottom of the stack. `AuthState.login`/`register`
+notify listeners as documented, and `AuthGate` does rebuild and pick a new
+child (`MarketMapGameScreen`, `VendorDashboardScreen`, or
+`CharacterSelectScreen(mandatory: true)`) — but that rebuild happens on
+the *bottom* route, invisible behind whichever login/register route is
+still on top. Nothing was popping that route, so the user stayed stuck
+looking at the form they'd just submitted. Fixed by having both screens'
+`_submit()` call `Navigator.of(context).popUntil((route) => route.isFirst)`
+right after a successful call, once `mounted` is confirmed true — `popUntil`
+rather than a single `pop()` because the stack can be two deep (Welcome →
+Login → Register) depending on which link the user followed to get there.
+
 ## Payment
 
 Payment is mandatory and happens before the vendor ever sees the order —

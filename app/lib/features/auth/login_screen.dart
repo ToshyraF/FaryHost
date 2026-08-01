@@ -27,8 +27,13 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  /// ยิง login ไปที่ backend ผ่าน AuthState เมื่อสำเร็จ AuthGate จะสลับหน้าจอ
-  /// ให้เองอัตโนมัติ (เพราะ AuthState เป็น ChangeNotifier ที่ AuthGate ฟังอยู่)
+  /// ยิง login ไปที่ backend ผ่าน AuthState เมื่อสำเร็จ AuthState (ChangeNotifier)
+  /// จะทำให้ AuthGate เลือก child ใหม่ (เช่น MarketMapGameScreen) — แต่ AuthGate
+  /// อยู่ที่ route แรกสุดของ Navigator ส่วนหน้านี้ถูก push ทับมาจาก
+  /// WelcomeScreen อีกที การ rebuild ของ AuthGate เกิด "ข้างใต้" route นี้
+  /// เฉยๆ ไม่ได้ทำให้หน้าจอที่เห็นอยู่เปลี่ยนเอง ต้อง pop กลับไปที่ route แรก
+  /// (popUntil isFirst เพราะอาจกดสลับไปมาระหว่างหน้า login/register มาก่อน
+  /// ทำให้ stack ลึกกว่า 1 ชั้น) ถึงจะเห็นหน้าที่ AuthGate เลือกไว้จริงๆ
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -40,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
             email: _emailController.text.trim(),
             password: _passwordController.text,
           );
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {

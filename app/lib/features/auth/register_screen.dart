@@ -34,7 +34,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   /// สมัครสมาชิกแล้ว login ให้อัตโนมัติในคราวเดียว (AuthState.register จะเก็บ
-  /// token ที่ backend ออกให้ตอนสมัครเสร็จ ไม่ต้อง login ซ้ำ)
+  /// token ที่ backend ออกให้ตอนสมัครเสร็จ ไม่ต้อง login ซ้ำ) หน้านี้อาจถูก
+  /// push ทับมาจาก WelcomeScreen หรือ LoginScreen ก็ได้ (ปุ่ม "ยังไม่มีบัญชี?
+  /// สมัครสมาชิก") ทำให้ Navigator stack ลึกได้มากกว่า 1 ชั้น — ต้อง
+  /// popUntil((route) => route.isFirst) กลับไปที่ route แรก (AuthGate) เอง
+  /// หลังสมัครสำเร็จ ไม่งั้นจะค้างอยู่หน้านี้ต่อ เพราะ AuthGate rebuild ใหม่
+  /// ที่ route แรกสุดไม่ได้ทำให้ route ที่ push ทับอยู่หายไปเอง
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -49,6 +54,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             role: _role,
             phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
           );
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
