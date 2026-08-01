@@ -112,10 +112,19 @@ fractional `Align`/`OverflowBox` alignment for sprite/UI-part placement in
 this codebase. `CharacterState` (`lib/core/state/character_state.dart`)
 persists which of the 10 characters the customer picked via
 `shared_preferences`, the same pattern as `AuthState`'s session
-persistence; `CharacterSelectScreen` (reachable from the map's app bar) is
-a tap-to-pick grid of all 10 down-facing idle frames. Flame's
-`PlayerComponent` draws from the same sprite sheets directly (see below),
-not through `CharacterSprite`.
+persistence; `CharacterSelectScreen` is a tap-to-pick grid of all 10
+down-facing idle frames, reachable two ways: from the map's app bar at any
+time (pushed on top, pops back on pick), or — per a later user request —
+`mandatory: true` right after registering a new customer account, wired
+through `AuthGate` in `main.dart`. `AuthState.register()` sets a
+`justRegistered` flag (cleared by `AuthState.clearJustRegistered()`, which
+`CharacterSelectScreen` calls instead of `Navigator.pop()` when
+`mandatory`) that `AuthGate` checks after the vendor-role branch: a
+freshly-registered customer lands on the mandatory character picker (no
+back button — there's nothing pushed to pop to) before ever seeing the
+market map, while an ordinary login (existing account) skips straight to
+`MarketMapGameScreen` as before. Flame's `PlayerComponent` draws from the
+same sprite sheets directly (see below), not through `CharacterSprite`.
 
 ### Game Boy-style step movement, camera-follow, and D-pad
 
@@ -265,9 +274,11 @@ reverted — this is still an open, known issue, not yet fixed.
 
 `test/golden/` has widget-level golden (screenshot) tests for the screens
 that render meaningfully without a live backend: welcome, login, register,
-cart (empty + with items), the market map, the character select grid, the
-vendor list, order status (both the awaiting-payment QR view and the
-post-payment pickup-code view), and the vendor create-stall form. Screens that need data mock the network via
+cart (empty + with items), the market map, the character select grid (both
+its normal poppable form and the `mandatory: true` form shown right after
+registering, which has no back button), the vendor list, order status
+(both the awaiting-payment QR view and the post-payment pickup-code view),
+and the vendor create-stall form. Screens that need data mock the network via
 `package:http/testing.dart`'s `MockClient` (see
 `vendor_list_screen_test.dart`, `order_status_screen_test.dart`,
 `vendor_create_stall_screen_test.dart` for the pattern) — `test_helpers.dart`'s

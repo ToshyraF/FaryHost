@@ -13,4 +13,13 @@ void main() {
       matchesGoldenFile('goldens/character_select_screen.png'),
     );
   });
+
+  testWidgets('CharacterSelectScreen แบบ mandatory ไม่มีปุ่มย้อนกลับ', (tester) async {
+    await pumpGolden(tester, const CharacterSelectScreen(mandatory: true));
+
+    await expectLater(
+      find.byType(CharacterSelectScreen),
+      matchesGoldenFile('goldens/character_select_screen_mandatory.png'),
+    );
+  });
 }

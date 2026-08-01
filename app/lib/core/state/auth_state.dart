@@ -13,6 +13,7 @@ class AuthState extends ChangeNotifier {
 
   AppUser? _user;
   bool _loading = true; // true ระหว่างที่กำลังโหลด session เก่าจาก storage ตอนเปิดแอป
+  bool _justRegistered = false; // true เฉพาะช่วงหลังสมัครสมาชิกสำเร็จ จนกว่าจะเลือกตัวละครเสร็จ
 
   AuthState(this.apiClient) {
     _restore();
@@ -21,6 +22,15 @@ class AuthState extends ChangeNotifier {
   AppUser? get user => _user;
   bool get isLoading => _loading;
   bool get isLoggedIn => _user != null;
+  bool get justRegistered => _justRegistered;
+
+  /// เรียกหลังลูกค้าที่เพิ่งสมัครสมาชิกเลือกตัวละครเสร็จ เพื่อให้ AuthGate
+  /// เปลี่ยนจากหน้าเลือกตัวละครไปหน้าเดินเล่นในตลาดตามปกติ
+  void clearJustRegistered() {
+    if (!_justRegistered) return;
+    _justRegistered = false;
+    notifyListeners();
+  }
 
   /// ตอนเปิดแอป เช็คว่ามี token/user ที่เคย login ไว้ค้างอยู่ใน storage ไหม
   /// ถ้ามีก็เอามาใช้ต่อเลยโดยไม่ต้อง login ใหม่
@@ -43,6 +53,7 @@ class AuthState extends ChangeNotifier {
 
   Future<void> login({required String email, required String password}) async {
     final result = await apiClient.login(email: email, password: password);
+    _justRegistered = false;
     await _onAuthenticated(result);
   }
 
@@ -60,6 +71,9 @@ class AuthState extends ChangeNotifier {
       role: role,
       phone: phone,
     );
+    // ให้ AuthGate พาลูกค้าที่เพิ่งสมัครไปหน้าเลือกตัวละครก่อนเข้าตลาดครั้งแรก
+    // (login ปกติไม่ผ่านทางนี้ จึงไม่โดนบังคับเลือกซ้ำทุกครั้ง)
+    _justRegistered = true;
     await _onAuthenticated(result);
   }
 
@@ -77,6 +91,7 @@ class AuthState extends ChangeNotifier {
   Future<void> logout() async {
     apiClient.token = null;
     _user = null;
+    _justRegistered = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('auth_user');

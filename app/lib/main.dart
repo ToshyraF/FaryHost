@@ -7,6 +7,7 @@ import 'core/state/cart_state.dart';
 import 'core/state/character_state.dart';
 import 'core/theme.dart';
 import 'features/auth/welcome_screen.dart';
+import 'features/customer/character_select_screen.dart';
 import 'features/customer/market_game/market_map_game_screen.dart';
 import 'features/vendor/vendor_dashboard_screen.dart';
 
@@ -43,8 +44,11 @@ class FaryHostApp extends StatelessWidget {
 
 /// ตัวตัดสินใจ routing แบบ role-based ตัวเดียวของแอป: ยังไม่ login ไปหน้า
 /// ต้อนรับ (เลือกเข้าสู่ระบบ/สมัครสมาชิกจากตรงนั้น), login แล้วเป็น vendor
-/// ไปหน้า dashboard ร้านค้า, login แล้วเป็น customer ไปหน้า "เดินเล่นในตลาด"
-/// เวอร์ชัน Flame (`MarketMapGameScreen`) — เดิมมีเวอร์ชัน widget ล้วนๆ
+/// ไปหน้า dashboard ร้านค้า, login แล้วเป็น customer ที่เพิ่งสมัครสมาชิกใหม่
+/// (`AuthState.justRegistered`) ไปหน้าเลือกตัวละครก่อน (แบบ mandatory เลือก
+/// เสร็จแล้วเข้าตลาดเลย ไม่มีปุ่มย้อนกลับ) ส่วน login แล้วเป็น customer ปกติ
+/// (ไม่ใช่เพิ่งสมัคร) ไปหน้า "เดินเล่นในตลาด" เวอร์ชัน Flame
+/// (`MarketMapGameScreen`) ตรงๆ — เดิมมีเวอร์ชัน widget ล้วนๆ
 /// (`MarketMapScreen`) เป็นหน้าหลักและ Flame เป็นแค่ทางเลือกทดลองที่เข้าถึง
 /// จากปุ่มในแอปบาร์ แต่หลังยืนยันแล้วว่า Flame ใช้งานได้จริง ผู้ใช้ขอให้เหลือ
 /// แค่เวอร์ชันเกมเวอร์ชันเดียว จึงลบเวอร์ชัน widget ทิ้งไปทั้งไฟล์ (ดู
@@ -64,6 +68,9 @@ class AuthGate extends StatelessWidget {
     }
     if (auth.user!.isVendor) {
       return const VendorDashboardScreen();
+    }
+    if (auth.justRegistered) {
+      return const CharacterSelectScreen(mandatory: true);
     }
     return const MarketMapGameScreen();
   }
