@@ -144,6 +144,51 @@ market map, while an ordinary login (existing account) skips straight to
 `MarketMapGameScreen` as before. Flame's `PlayerComponent` draws from the
 same sprite sheets directly (see below), not through `CharacterSprite`.
 
+### Map decorations: trees and animals
+
+Per a later user request ("put trees or animals from this pack on the map,
+arranged nicely, with room left for the stalls"), the map got a static,
+non-interactive border of decorations: alternating round/pine trees down
+both edges (one pair per stall row, plus a pair framing the entrance at
+the top) and a chicken + cow near the bottom. `DecorationComponent`
+(`market_flame_game.dart`) draws one hand-measured `srcRect` out of a
+shared sprite sheet, the same `canvas.drawImageRect` approach
+`PlayerComponent` already used — multiple decorations sharing one atlas
+(e.g. every tree, all from `Nature_Tileset.png`) share a single decoded
+`Image` via a `static` cache keyed by asset path, so it's decoded once
+regardless of how many trees are placed. A new `_sideMargin` (70px)
+reserves a strip down both edges of the map for these decorations —
+`cellWidth`, `_stallPosition`, and the stall grid all shift inward by that
+amount so trees never sit on top of a stall.
+
+The assets come from a different pack than the character sprites above —
+"Little Dreamyland - Free Pack" by Starmixu & Utaskuas — with a stricter
+license: **non-commercial use only**, no AI-training use, credit required
+("Assets from Little Dreamyland by Starmixu & Utaskuas", see
+`assets/sprites/CREDITS.txt` for the full text). Confirmed with the user
+before adding these that this project is non-commercial/a demo; if that
+ever changes, these three files need to be swapped out first.
+
+Measuring the sprite coordinates took longer than expected. This sandbox
+has no PIL/ImageMagick/any image-editing tool (no network access to
+install one), so a small pure-stdlib PNG decoder/cropper/upscaler
+(`zlib` + `struct`, hand-rolled PNG filter reconstruction) was written
+just to inspect the packs — see the session's scratchpad, not committed
+to the repo. The `Chicken_Idle.png`/`Cow_Idle.png` animation sheets turned
+out to be a clean, uniform 48x48-per-frame grid (8 columns for the walk
+cycle x 4 rows for facing direction, same row convention as the character
+sheets), easy to read off a grid overlay. `Nature_Tileset.png`, though,
+is packed *tight* — each object kerned to its own actual pixel bounds,
+not laid out on any fixed cell size. Guessing a uniform grid (48px, then
+64px) reliably clipped trees in half or bled in a neighboring sprite;
+what actually worked was cropping generous candidate boxes, viewing them
+upscaled, and narrowing down by trial and error until each tree rendered
+whole with clean blank padding on every side. The two rects used
+(`_roundTreeSrc`, `_pineTreeSrc` in `market_flame_game.dart`) are the
+result of that manual calibration, not a formula — if this pack ever
+needs a third tree/object pulled from the same atlas, expect to repeat
+the same trial-and-error, not compute a coordinate from a row/column index.
+
 ### Game Boy-style step movement, camera-follow, and D-pad
 
 Movement used to be a free continuous slide: tapping anywhere moved the

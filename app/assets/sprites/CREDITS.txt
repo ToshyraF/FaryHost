@@ -14,3 +14,36 @@ columns 0-3 are the walk cycle.
 
 Not bundled as a Flutter asset (not declared in pubspec.yaml) -- this file
 is documentation only, kept alongside the sprites it describes.
+
+=======================================================================================================================================================
+
+Market map decorations (dreamyland/Nature_Tileset.png, dreamyland/Chicken_Idle.png,
+dreamyland/Cow_Idle.png)
+
+Source: "Little Dreamyland - Free Pack" by Starmixu & Utaskuas
+        starmixu.itch.io/little-dreamyland-asset-pack
+
+License (per the pack's own LICENSE.txt, bundled by the user with the pack):
+"Free for non-commercial projects... cannot be used for anything related to
+NFTs or AI training... Redistributing or reselling is not permitted."
+Credit required: "Assets from Little Dreamyland by Starmixu & Utaskuas."
+
+Unlike the character sheets above, this pack is NOT cleared for commercial
+use -- confirmed with the user (2026-08-01) that this project is
+non-commercial/a demo before using it. If this project ever becomes
+commercial, these three files (and any code referencing them in
+market_flame_game.dart) need to be swapped for a commercially-licensed
+alternative first.
+
+Nature_Tileset.png is a packed, non-uniform atlas (items are tightly
+kerned to their actual pixel bounds, not laid out on a fixed grid --
+confirmed the hard way, by cropping guessed grid cells and seeing them
+clip trees in half). market_flame_game.dart's DecorationComponent reads
+two hand-measured sub-rects out of it directly: a round tree at roughly
+(10, 15, 45, 52) and a pine tree at (48, 15, 40, 50). Chicken_Idle.png and
+Cow_Idle.png, by contrast, are clean animation sheets: 48x48 frames, 8
+columns (walk cycle) x 4 rows (row 0 = facing away/up, 1 = left, 2 =
+right, 3 = facing the viewer/down) -- same row convention as the
+character sheets above. Only the front-facing idle frame (row 3, column
+0, i.e. (0, 144, 48, 48)) is used, as a static decoration, not an
+animation.

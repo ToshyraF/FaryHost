@@ -39,6 +39,13 @@ flutter:
     - assets/sprites/character_08.png
     - assets/sprites/character_09.png
     - assets/sprites/character_10.png
+  # Decorations (trees, chicken, cow) for the market map background --
+  # non-commercial use only, credit required; see assets/sprites/CREDITS.txt.
+  # Referenced by srcRect, same as the character sheets above -- not cropped
+  # into separate files.
+    - assets/sprites/dreamyland/Nature_Tileset.png
+    - assets/sprites/dreamyland/Chicken_Idle.png
+    - assets/sprites/dreamyland/Cow_Idle.png
   # Bundled so Thai text renders consistently across platforms and, more
   # importantly here, in golden tests (the flutter_tester test environment
   # has no real fonts unless the app explicitly ships one — see

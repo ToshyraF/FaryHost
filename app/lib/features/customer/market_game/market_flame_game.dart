@@ -16,6 +16,11 @@ const _stallSize = 72.0;
 const _topPadding = 60.0;
 const _bottomPadding = 80.0;
 const _nearRadius = 70.0;
+// เว้นขอบซ้าย-ขวาของแผนที่ไว้ปลูกต้นไม้ประดับ (ดู _addDecorations) โดยไม่ไป
+// บังช่องวางร้านค้า -- ร้านค้ายังคงจัดกริด _columns คอลัมน์เท่าเดิม แค่ขยับ
+// เข้ามาจากขอบจอทั้งสองข้างเท่ากับระยะนี้ ค่านี้ต้องกว้างพอให้ต้นไม้ (กว้าง
+// สุด ~58px, อยู่กึ่งกลางแนวขอบ) ไม่ล้ำออกนอกจอหรือทับช่องร้านค้า
+const _sideMargin = 70.0;
 // ระยะขอบกันตัวละครเดินชนขอบแผนที่/หลุดจอ — เวอร์ชันแรกของไฟล์นี้ไม่เคย
 // clamp ตำแหน่งผู้เล่นเลย (แค่กล้องที่ clamp เองใน update() ด้านล่าง) เลย
 // เดินทะลุขอบแผนที่ไปได้จริง แก้พร้อมกับการเปลี่ยนมาเดินทีละก้าวด้านล่าง
@@ -34,6 +39,27 @@ const _stepSeconds = 0.16; // เท่ากับ _stepDuration แต่เ�
 // (หลัง), คอลัมน์ 0-3 คือ walk cycle — ที่มา/สิทธิ์การใช้งานอยู่ใน
 // assets/sprites/CREDITS.txt
 const _frameSize = 32.0;
+
+// ต้นไม้/สัตว์ประดับแผนที่ จาก "Little Dreamyland - Free Pack" โดย Starmixu &
+// Utaskuas -- ต่างจาก sprite ตัวละครด้านบน แพ็คนี้ใช้ได้เฉพาะโปรเจกต์ที่ไม่
+// เชิงพาณิชย์เท่านั้น และต้องให้เครดิตตามที่ license กำหนด (ยืนยันกับผู้ใช้
+// แล้วว่าโปรเจกต์นี้ไม่เชิงพาณิชย์ ดู assets/sprites/CREDITS.txt สำหรับ
+// รายละเอียดและสิ่งที่ต้องทำถ้าจะเปลี่ยนเป็นเชิงพาณิชย์ทีหลัง)
+//
+// Nature_Tileset.png เป็น atlas แบบ "แน่นไม่เท่ากัน" (แต่ละชิ้นแนบชิดขอบ
+// พิกเซลจริงของตัวเอง ไม่ได้วางบน grid คงที่แบบ sprite sheet ตัวละคร) พิกัด
+// src ด้านล่างวัดเองด้วยมือทีละต้น (ลองเดา grid 48px ก่อนแล้วพบว่าตัดต้นไม้
+// ขาดครึ่ง เลยต้องหาขอบเขตจริงทีละภาพแทน) ส่วน Chicken_Idle.png/Cow_Idle.png
+// เป็น sheet ปกติ: เฟรม 48x48, 8 คอลัมน์ (walk cycle) x 4 แถว (แถว 0=หันหลัง/
+// ขึ้น, 1=ซ้าย, 2=ขวา, 3=หันหน้าเข้าจอ/ลง -- แถวเดียวกับ sprite ตัวละคร) ใช้
+// แค่เฟรมหันหน้า (แถว3 คอลัมน์0) เป็นภาพนิ่งประดับ ไม่ใช่ภาพเคลื่อนไหว
+const _dreamylandNatureAsset = 'assets/sprites/dreamyland/Nature_Tileset.png';
+const _dreamylandChickenAsset = 'assets/sprites/dreamyland/Chicken_Idle.png';
+const _dreamylandCowAsset = 'assets/sprites/dreamyland/Cow_Idle.png';
+
+const _roundTreeSrc = Rect.fromLTWH(10, 15, 45, 52);
+const _pineTreeSrc = Rect.fromLTWH(48, 15, 40, 50);
+const _animalIdleFrontSrc = Rect.fromLTWH(0, 144, 48, 48);
 
 // public เพราะต้องใช้ข้ามไฟล์ (D-pad ใน market_map_game_screen.dart เรียก
 // MarketFlameGame.beginDpadMovement/endDpadMovement ซึ่งรับ/ใช้ type นี้)
@@ -94,7 +120,8 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
     // การโหลดภาพเลย ดู PlayerComponent.onLoad() สำหรับที่ที่ decode เกิดขึ้นจริง
     final mapHeight = _mapHeight(vendors.length);
     _worldHeight = mapHeight;
-    final cellWidth = size.x / _columns;
+    final cellWidth = (size.x - _sideMargin * 2) / _columns;
+    final rows = (vendors.length / _columns).ceil();
 
     // ทางเดินสีเข้มขึ้นสลับกับพื้นตลาด (สีพื้นมาจาก backgroundColor() ด้านบน)
     for (double y = _topPadding + _cellHeight / 2 - 14; y < mapHeight; y += _cellHeight) {
@@ -106,6 +133,10 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
         ),
       );
     }
+
+    // เพิ่มต้นไม้/สัตว์ประดับก่อนร้านค้า/ผู้เล่น ให้วาดอยู่ชั้นล่างสุด (ไม่บัง
+    // ป้ายร้านหรือตัวละคร)
+    _addDecorations(rows);
 
     for (var i = 0; i < vendors.length; i++) {
       final vendor = vendors[i];
@@ -279,7 +310,7 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
     final row = index ~/ _columns;
     final col = index % _columns;
     return Vector2(
-      col * cellWidth + cellWidth / 2,
+      _sideMargin + col * cellWidth + cellWidth / 2,
       row * _cellHeight + _cellHeight / 2 + _topPadding,
     );
   }
@@ -287,6 +318,51 @@ class MarketFlameGame extends FlameGame with TapCallbacks {
   double _mapHeight(int vendorCount) {
     final rows = (vendorCount / _columns).ceil();
     return rows * _cellHeight + _topPadding + _bottomPadding;
+  }
+
+  // แนวต้นไม้ (สลับต้นกลม/ต้นสน) เรียงตามแนวขอบซ้าย-ขวาให้ตรงกับแต่ละแถวร้านค้า
+  // พอดี (ไม่ล้ำเข้าไปในช่อง _sideMargin ที่เว้นไว้ให้ร้านค้า) บวกต้นไม้ริม
+  // ทางเข้าด้านบน (หลบจุดเกิดผู้เล่นตรงกลาง) และไก่+วัวเป็นจุดตกแต่งท้ายแผนที่
+  void _addDecorations(int rows) {
+    final leftX = _sideMargin / 2;
+    final rightX = size.x - _sideMargin / 2;
+    for (var row = 0; row < rows; row++) {
+      final y = row * _cellHeight + _cellHeight / 2 + _topPadding;
+      final roundOnLeft = row.isEven;
+      add(_treeAt(Vector2(leftX, y), round: roundOnLeft));
+      add(_treeAt(Vector2(rightX, y), round: !roundOnLeft));
+    }
+    // +15 กันไม่ให้ยอดต้นไม้ (สูงสุด ~67px, anchor เป็นฐานล่าง) โผล่เลยขอบบนสุด
+    // ของแผนที่ (y=0) ซึ่งกล้องไม่มีวันเลื่อนขึ้นไปให้เห็นอยู่แล้ว
+    add(_treeAt(Vector2(leftX, _topPadding + 15), round: true));
+    add(_treeAt(Vector2(rightX, _topPadding + 15), round: false));
+
+    final bottomY = _worldHeight - _bottomPadding / 2;
+    add(
+      DecorationComponent(
+        assetPath: _dreamylandChickenAsset,
+        srcRect: _animalIdleFrontSrc,
+        decorPosition: Vector2(size.x / 2 - 36, bottomY),
+        displaySize: Vector2.all(34),
+      ),
+    );
+    add(
+      DecorationComponent(
+        assetPath: _dreamylandCowAsset,
+        srcRect: _animalIdleFrontSrc,
+        decorPosition: Vector2(size.x / 2 + 36, bottomY),
+        displaySize: Vector2.all(42),
+      ),
+    );
+  }
+
+  DecorationComponent _treeAt(Vector2 position, {required bool round}) {
+    return DecorationComponent(
+      assetPath: _dreamylandNatureAsset,
+      srcRect: round ? _roundTreeSrc : _pineTreeSrc,
+      decorPosition: position,
+      displaySize: round ? Vector2(58, 67) : Vector2(52, 65),
+    );
   }
 }
 
@@ -403,5 +479,53 @@ class StallComponent extends PositionComponent with TapCallbacks {
   @override
   void onTapUp(TapUpEvent event) {
     onTap();
+  }
+}
+
+/// ต้นไม้/สัตว์ประดับแผนที่ 1 ชิ้น -- ภาพนิ่ง ไม่มี tap/animation ใดๆ วาดจาก
+/// [srcRect] หนึ่งชิ้นของ atlas ที่ [assetPath] ชี้ไป (ดูหมายเหตุการวัดพิกัด
+/// ด้านบนไฟล์นี้) ตำแหน่ง [decorPosition] คือจุดที่ "ฐาน" ของภาพยืนอยู่บนพื้น
+/// (Anchor.bottomCenter) เหมือนต้นไม้/สัตว์จริงยืนอยู่บนจุดนั้น
+///
+/// หลาย instance ที่ใช้ atlas เดียวกัน (เช่นต้นไม้หลายต้นจาก Nature_Tileset.png
+/// เดียวกัน) แชร์ Image ที่ decode ไว้แล้วผ่าน cache แบบ static คีย์ด้วย
+/// assetPath กันไม่ให้ decode ซ้ำซ้อนทุกต้น
+class DecorationComponent extends PositionComponent {
+  final String assetPath;
+  final Rect srcRect;
+
+  static final Map<String, Image> _sheetCache = {};
+
+  DecorationComponent({
+    required this.assetPath,
+    required this.srcRect,
+    required Vector2 decorPosition,
+    required Vector2 displaySize,
+  }) : super(position: decorPosition, size: displaySize, anchor: Anchor.bottomCenter);
+
+  Image? _sheet;
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    final cached = _sheetCache[assetPath];
+    if (cached != null) {
+      _sheet = cached;
+      return;
+    }
+    final data = await rootBundle.load(assetPath);
+    final codec = await instantiateImageCodec(data.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    _sheet = frame.image;
+    _sheetCache[assetPath] = frame.image;
+  }
+
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+    final sheet = _sheet;
+    if (sheet == null) return; // ยังโหลดภาพไม่เสร็จ ข้ามเฟรมนี้ไปก่อน (เหมือน PlayerComponent)
+    final dst = Rect.fromLTWH(0, 0, size.x, size.y);
+    canvas.drawImageRect(sheet, srcRect, dst, Paint()..filterQuality = FilterQuality.none);
   }
 }
