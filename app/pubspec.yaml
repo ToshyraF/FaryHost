@@ -1,0 +1,59 @@
+name: faryhost_app
+description: Pre-order and pickup app for flea/night market food stalls.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  provider: ^6.1.2
+  shared_preferences: ^2.2.3
+  # Experimental: powers MarketMapGameScreen only (see lib/features/customer/
+  # market_game/). Never fetched/built here -- this sandbox has no network
+  # access to pub.dev -- so this is genuinely unverified until CI (which has
+  # both Flutter and network access) runs against it.
+  flame: ^1.18.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  # Customer avatar sprite sheets (4 directions x 4 walk frames, 32x32 each)
+  # -- licensed for commercial use, no attribution required; see
+  # assets/sprites/CREDITS.txt for the source and full license text.
+  assets:
+    - assets/sprites/character_01.png
+    - assets/sprites/character_02.png
+    - assets/sprites/character_03.png
+    - assets/sprites/character_04.png
+    - assets/sprites/character_05.png
+    - assets/sprites/character_06.png
+    - assets/sprites/character_07.png
+    - assets/sprites/character_08.png
+    - assets/sprites/character_09.png
+    - assets/sprites/character_10.png
+  # Decorations (trees, chicken, cow) for the market map background --
+  # non-commercial use only, credit required; see assets/sprites/CREDITS.txt.
+  # Referenced by srcRect, same as the character sheets above -- not cropped
+  # into separate files.
+    - assets/sprites/dreamyland/Nature_Tileset.png
+    - assets/sprites/dreamyland/Chicken_Idle.png
+    - assets/sprites/dreamyland/Cow_Idle.png
+  # Bundled so Thai text renders consistently across platforms and, more
+  # importantly here, in golden tests (the flutter_tester test environment
+  # has no real fonts unless the app explicitly ships one — see
+  # test/flutter_test_config.dart). Loma is from the fonts-tlwg project;
+  # see assets/fonts/LICENSE-Loma.txt.
+  fonts:
+    - family: Loma
+      fonts:
+        - asset: assets/fonts/Loma.otf
+        - asset: assets/fonts/Loma-Bold.otf
+          weight: 700

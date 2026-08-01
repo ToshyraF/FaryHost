@@ -1,0 +1,77 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'core/api_client.dart';
+import 'core/state/auth_state.dart';
+import 'core/state/cart_state.dart';
+import 'core/state/character_state.dart';
+import 'core/theme.dart';
+import 'features/auth/welcome_screen.dart';
+import 'features/customer/character_select_screen.dart';
+import 'features/customer/market_game/market_map_game_screen.dart';
+import 'features/vendor/vendor_dashboard_screen.dart';
+
+void main() {
+  final apiClient = ApiClient();
+  runApp(FaryHostApp(apiClient: apiClient));
+}
+
+class FaryHostApp extends StatelessWidget {
+  final ApiClient apiClient;
+
+  const FaryHostApp({super.key, required this.apiClient});
+
+  @override
+  Widget build(BuildContext context) {
+    // MultiProvider ทำให้ทุกหน้าจอในแอปเข้าถึง ApiClient, AuthState, CartState
+    // ได้ผ่าน context.read<T>()/context.watch<T>() โดยไม่ต้องส่งผ่าน constructor
+    // ทีละชั้น (dependency injection แบบง่ายๆ)
+    return MultiProvider(
+      providers: [
+        Provider<ApiClient>.value(value: apiClient),
+        ChangeNotifierProvider(create: (_) => AuthState(apiClient)),
+        ChangeNotifierProvider(create: (_) => CartState()),
+        ChangeNotifierProvider(create: (_) => CharacterState()),
+      ],
+      child: MaterialApp(
+        title: 'FaryHost',
+        theme: buildAppTheme(),
+        home: const AuthGate(),
+      ),
+    );
+  }
+}
+
+/// ตัวตัดสินใจ routing แบบ role-based ตัวเดียวของแอป: ยังไม่ login ไปหน้า
+/// ต้อนรับ (เลือกเข้าสู่ระบบ/สมัครสมาชิกจากตรงนั้น), login แล้วเป็น vendor
+/// ไปหน้า dashboard ร้านค้า, login แล้วเป็น customer ที่เพิ่งสมัครสมาชิกใหม่
+/// (`AuthState.justRegistered`) ไปหน้าเลือกตัวละครก่อน (แบบ mandatory เลือก
+/// เสร็จแล้วเข้าตลาดเลย ไม่มีปุ่มย้อนกลับ) ส่วน login แล้วเป็น customer ปกติ
+/// (ไม่ใช่เพิ่งสมัคร) ไปหน้า "เดินเล่นในตลาด" เวอร์ชัน Flame
+/// (`MarketMapGameScreen`) ตรงๆ — เดิมมีเวอร์ชัน widget ล้วนๆ
+/// (`MarketMapScreen`) เป็นหน้าหลักและ Flame เป็นแค่ทางเลือกทดลองที่เข้าถึง
+/// จากปุ่มในแอปบาร์ แต่หลังยืนยันแล้วว่า Flame ใช้งานได้จริง ผู้ใช้ขอให้เหลือ
+/// แค่เวอร์ชันเกมเวอร์ชันเดียว จึงลบเวอร์ชัน widget ทิ้งไปทั้งไฟล์ (ดู
+/// app/README.md's "Market map")
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthState>();
+
+    if (auth.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (!auth.isLoggedIn) {
+      return const WelcomeScreen();
+    }
+    if (auth.user!.isVendor) {
+      return const VendorDashboardScreen();
+    }
+    if (auth.justRegistered) {
+      return const CharacterSelectScreen(mandatory: true);
+    }
+    return const MarketMapGameScreen();
+  }
+}
