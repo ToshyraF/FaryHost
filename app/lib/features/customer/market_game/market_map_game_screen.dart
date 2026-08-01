@@ -9,11 +9,13 @@ import '../../../core/state/character_state.dart';
 import '../character_select_screen.dart';
 import '../order_history_screen.dart';
 import '../vendor_list_screen.dart';
-import '../vendor_menu_screen.dart';
+import '../vendor_menu_sheet.dart';
 import 'market_flame_game.dart';
 
 /// หน้าแรกของลูกค้าแบบ "เดินเล่นในตลาด" — เดินไปตามที่แตะหรือกด D-pad ทีละ
-/// ก้าว (ดู market_flame_game.dart), แตะร้านค้าให้เดินไปหาแล้วเปิดเมนูเลย
+/// ก้าว (ดู market_flame_game.dart), แตะร้านค้าให้เดินไปหาแล้วเปิดเมนูเป็น
+/// popup (`VendorMenuSheet`) ลอยทับแผนที่แทนการ push ไปหน้าใหม่ทั้งหน้า —
+/// ปิด popup แล้วเดินต่อได้เลย ไม่ต้องกด back (ดู app/README.md's "Market map")
 /// render ด้วย [Flame](https://flame-engine.org) เดิมมีเวอร์ชัน widget ล้วนๆ
 /// (`MarketMapScreen`) เป็นหน้าหลักคู่กันไป และหน้านี้เป็นแค่ทางเลือกทดลองที่
 /// เข้าถึงจากปุ่มในแอปบาร์ของเวอร์ชันนั้น (กันความเสี่ยงตอน `flame` ยังไม่เคย
@@ -92,8 +94,13 @@ class _MarketMapGameScreenState extends State<MarketMapGameScreen> {
           final game = _game ??= MarketFlameGame(
             vendors: vendors,
             characterAssetPath: context.read<CharacterState>().selected.assetPath,
-            onOpenVendor: (vendor) => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => VendorMenuScreen(vendorId: vendor.id)),
+            onOpenVendor: (vendor) => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              builder: (_) => VendorMenuSheet(vendorId: vendor.id),
             ),
           );
           return Stack(

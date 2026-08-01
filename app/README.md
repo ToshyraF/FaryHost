@@ -79,6 +79,24 @@ landing on it doesn't also fire the proximity trigger right after). Every
 stall stays tappable regardless of avatar position (no functional gate),
 since this is a real ordering app first.
 
+Opening a stall's menu — whether by tap or by walking close — originally
+pushed a full-page route (`VendorMenuScreen`) on top of the map, the same
+as `VendorListScreen`'s plain list view still does today. A user reported
+this felt like "landing" on a whole new screen just to glance at one
+stall's menu, and asked for a popup instead. `VendorMenuSheet`
+(`lib/features/customer/vendor_menu_sheet.dart`) is the popup version —
+the same vendor-detail fetch, menu list, and cart button as
+`VendorMenuScreen`, but shown via `showModalBottomSheet` (rounded top
+corners, ~70% of screen height, `isScrollControlled: true` so it isn't
+capped to the default half-screen bottom-sheet height) instead of a
+`Navigator.push`. The map stays visible (dimmed by the modal barrier)
+underneath, and its D-pad/tap input is blocked while the sheet is open —
+the same as it would be behind any pushed route — but closing the sheet
+(the × button, or tapping the dimmed map outside it) drops straight back
+into the map with no back button needed. `VendorListScreen` keeps using
+the full-page `VendorMenuScreen`, since there's no map underneath worth
+preserving there.
+
 ### Sprite sheet and character selection
 
 The avatar is a real pixel-art sprite sheet, not hand-drawn — a hand-coded
